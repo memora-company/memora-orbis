@@ -7,7 +7,7 @@ The model gets three tools backed by an Orbis daemon:
   page_changes()         what changed since the last snapshot
 
 Start the Orbis daemon first (separate terminal):
-    npx -y @memoracompany/orbis --port 9222
+    npx -y @memoracompany/memora-orbis --port 9222
 
 Then:
     pip install -r requirements.txt

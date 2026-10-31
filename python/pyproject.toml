@@ -22,7 +22,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://orbis.memora.company"
-Repository = "https://github.com/memora-company/orbis"
+Repository = "https://github.com/memora-company/memora-orbis"
 
 [tool.setuptools.packages.find]
 where = ["."]

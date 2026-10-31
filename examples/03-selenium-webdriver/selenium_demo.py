@@ -2,7 +2,7 @@
 Example 03 (Python): Selenium WebDriver backed by Orbis
 
 Start the Orbis WebDriver server first (separate terminal):
-    npx -y @memoracompany/orbis serve --protocol webdriver --port 9515
+    npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 
 Then:
     pip install -r requirements.txt
@@ -63,7 +63,7 @@ def main() -> int:
         driver = webdriver.Remote(command_executor=WEBDRIVER_URL, options=webdriver.ChromeOptions())
     except Exception as exc:  # connection refused, session limit reached, ...
         print(f"Could not start a session at {WEBDRIVER_URL}: {exc}")
-        print("Start Orbis first:\n  npx -y @memoracompany/orbis serve --protocol webdriver --port 9515")
+        print("Start Orbis first:\n  npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515")
         server.shutdown()
         return 1
 

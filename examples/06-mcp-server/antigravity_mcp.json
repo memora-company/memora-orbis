@@ -2,7 +2,7 @@
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": {
         "ORBIS_NO_TELEMETRY": "1"
       }

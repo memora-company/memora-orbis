@@ -55,6 +55,6 @@ jobs:
       - run: pip install -r examples/03-selenium-webdriver/requirements.txt
       - name: Selenium (Python) over WebDriver (03)
         run: |
-          npx -y @memoracompany/orbis serve --protocol webdriver --port 9515 &
+          npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:9515/status > /dev/null && break; sleep 1; done
           python examples/03-selenium-webdriver/selenium_demo.py

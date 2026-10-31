@@ -6,7 +6,7 @@
   "homepage": "https://orbis.memora.company",
   "repository": {
     "type": "git",
-    "url": "https://github.com/memora-company/orbis.git"
+    "url": "https://github.com/memora-company/memora-orbis.git"
   },
   "type": "module",
   "engines": {
