@@ -1,8 +1,8 @@
-# TypeScript / Node.js SDK Reference
+﻿# TypeScript / Node.js SDK Reference
 
-This is the complete reference for the Node.js API exported by `@memoracompany/orbis`: the high-level `OrbisAgent` controller, the lower-level `OrbisBrowser`, `OrbisContext`, and `OrbisPage` classes, every exported type, and the building blocks (parser, distiller, locator engine, adapters) you can use on their own.
+This is the complete reference for the Node.js API exported by `@memoracompany/memora-orbis`: the high-level `OrbisAgent` controller, the lower-level `OrbisBrowser`, `OrbisContext`, and `OrbisPage` classes, every exported type, and the building blocks (parser, distiller, locator engine, adapters) you can use on their own.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -23,7 +23,7 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 ## Installation and imports
 
 ```bash
-npm install @memoracompany/orbis
+npm install @memoracompany/memora-orbis
 ```
 
 The package is ESM (`"type": "module"`) and ships TypeScript declarations. Use `import`, not `require`.
@@ -35,7 +35,7 @@ import {
   OrbisPage,
   type SemanticPageSnapshot,
   type PageDiff,
-} from '@memoracompany/orbis';
+} from '@memoracompany/memora-orbis';
 ```
 
 Node.js 20 or 22 is required. No Chrome download is needed: the default engine is pure Node.js.
@@ -48,7 +48,7 @@ Node.js 20 or 22 is required. No Chrome download is needed: the default engine i
 - **OrbisPage** is one tab: it downloads HTML, parses it into an in-memory DOM, runs the page's scripts in a V8 sandbox, and turns the result into an **action map** (numbered interactive elements `@1`, `@2`, ...) plus **Markdown**. There is no rendering engine, no layout and no screenshots. See [concepts.md](./concepts.md) and [limitations.md](./limitations.md).
 - **OrbisAgent** is a convenience wrapper: one browser, one page, and (with `launch()`) a CDP server so Playwright/Puppeteer can attach to the same process.
 
-Everything except navigation is **synchronous** and runs in your process. A typical agent turn is: `goto()` → read `actionMapText` → `act()` / `fillForm()` → `diff()`.
+Everything except navigation is **synchronous** and runs in your process. A typical agent turn is: `goto()` â†’ read `actionMapText` â†’ `act()` / `fillForm()` â†’ `diff()`.
 
 ---
 
@@ -442,7 +442,7 @@ interface NavigateOptions {
 }
 ```
 
-Loading sequence: request with manual redirect following (up to 20 hops, cookies captured on every hop, 303 and POST→301/302 become GET) → parse HTML → run classic scripts in document order (external ones downloaded in parallel), then `defer`, then `async`; module scripts are bundled → wait until fetch/XHR/short timers are idle (bounded by `settleTimeoutMs` and the timeout) → follow `window.location` assignments made by scripts (up to 5). Pages without scripts never create a JS context.
+Loading sequence: request with manual redirect following (up to 20 hops, cookies captured on every hop, 303 and POSTâ†’301/302 become GET) â†’ parse HTML â†’ run classic scripts in document order (external ones downloaded in parallel), then `defer`, then `async`; module scripts are bundled â†’ wait until fetch/XHR/short timers are idle (bounded by `settleTimeoutMs` and the timeout) â†’ follow `window.location` assignments made by scripts (up to 5). Pages without scripts never create a JS context.
 
 ```ts
 await page.goto('https://api.example.com/search', {
@@ -530,7 +530,7 @@ Note: a step's `submit: 'text=Next'` uses `activate()`, so a "Next" button that 
 
 #### `extract(selector, attribute?, limit = 50)`
 
-CSS selector, first `limit` matches. `attribute`: `'text'`/`'textContent'` → trimmed text; `'html'`/`'innerHTML'` → inner HTML; any other name → that attribute (or `null`); omitted → `{ tag, text, attributes }`.
+CSS selector, first `limit` matches. `attribute`: `'text'`/`'textContent'` â†’ trimmed text; `'html'`/`'innerHTML'` â†’ inner HTML; any other name â†’ that attribute (or `null`); omitted â†’ `{ tag, text, attributes }`.
 
 ```ts
 page.extract('a.storylink', 'href', 30);
@@ -887,7 +887,7 @@ These are stable enough to use directly when you do not need a browser object.
 Distilling HTML you already have, with no browser at all:
 
 ```ts
-import { parseHTML, extractSemanticSnapshot } from '@memoracompany/orbis';
+import { parseHTML, extractSemanticSnapshot } from '@memoracompany/memora-orbis';
 
 const doc = parseHTML(htmlFromYourCrawler);
 const snap = extractSemanticSnapshot(doc, 'https://source.example/page', { excludeSelectors: ['nav', 'footer'] });
@@ -907,7 +907,7 @@ await llm.invoke(`${snap.actionMapText}\n\n${snap.markdown}`);
 ### Minimal agent loop with an LLM
 
 ```ts
-import { OrbisAgent, OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const browser = new OrbisBrowser();
 const agent = new OrbisAgent(browser, browser.newPage()); // no CDP port needed

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Example 06: Talk to the Orbis MCP server with raw JSON-RPC over stdio
  *
  * This is what Claude Desktop, Claude Code, Cursor and other MCP clients do under the hood.
@@ -28,7 +28,7 @@ const site = http.createServer((req, res) => {
 async function main() {
   await new Promise<void>((resolve) => site.listen(18095, '127.0.0.1', resolve));
 
-  // The orbis binary comes from the @memoracompany/orbis dependency of this example.
+  // The orbis binary comes from the @memoracompany/memora-orbis dependency of this example.
   // --engine native keeps the result identical on machines with and without Chrome.
   const child = spawn('npx', ['orbis', '--mcp', '--engine', 'native'], {
     stdio: ['pipe', 'pipe', 'inherit'],

@@ -2,7 +2,7 @@
 
 This page explains how Orbis makes HTTP requests and how to control them: request headers, the user agent, timeouts, TLS, redirects, proxies (HTTP, HTTPS and SOCKS), `NO_PROXY` rules, robots.txt compliance (RFC 9309) and cookie handling. All options are available as CLI flags and as the `network` option of the TypeScript SDK.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -57,7 +57,7 @@ All server commands (`orbis`, `orbis serve`) and `orbis fetch` accept the same n
 TypeScript example:
 
 ```ts
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const browser = new OrbisBrowser({
   network: {
@@ -172,7 +172,7 @@ MCP configuration example:
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp", "--use-env-proxy"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp", "--use-env-proxy"],
       "env": {
         "HTTPS_PROXY": "http://proxy.internal:3128",
         "NO_PROXY": "localhost,127.0.0.1",
@@ -186,7 +186,7 @@ MCP configuration example:
 ### Method 2: `network.proxy` in TypeScript
 
 ```ts
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 const agent = await OrbisAgent.launch({
   cdpPort: 9333,

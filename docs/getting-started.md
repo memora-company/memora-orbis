@@ -1,8 +1,8 @@
-# Getting Started
+﻿# Getting Started
 
 This guide takes you from nothing to a working Orbis setup in about five minutes. You will install Orbis, check the installation, load a page from the command line, drive a page from TypeScript and from Python, and connect an existing Playwright or Selenium script. Each section ends with a link to the full reference.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -37,19 +37,19 @@ Pick the installation that matches how you will use Orbis.
 **As a library in a Node.js project** (gives you the SDK and a local `orbis` binary):
 
 ```bash
-npm install @memoracompany/orbis
+npm install @memoracompany/memora-orbis
 ```
 
 **As a global command-line tool:**
 
 ```bash
-npm install -g @memoracompany/orbis
+npm install -g @memoracompany/memora-orbis
 ```
 
 **Without installing** (downloads on first use, good for MCP configs and quick tests):
 
 ```bash
-npx -y @memoracompany/orbis --help
+npx -y @memoracompany/memora-orbis --help
 ```
 
 **Python SDK** (an HTTP client; you also need the Node.js daemon from one of the options above):
@@ -60,7 +60,7 @@ pip install memora-orbis
 
 The npm package installs three binary names that all run the same program: `orbis`, `memora-orbis` and `memora-browser`. `memora-browser` prints a deprecation warning; use `orbis`.
 
-> **Note:** There is no npm package called `memora-orbis`. `npx memora-orbis` fails with a 404. Always use `npx -y @memoracompany/orbis`.
+> **Note:** There is no npm package called `memora-orbis`. `npx memora-orbis` fails with a 404. Always use `npx -y @memoracompany/memora-orbis`.
 
 ## 3. Verify the installation
 
@@ -74,7 +74,7 @@ Expected output:
 0.1.0
 ```
 
-If you installed locally instead of globally, use `npx orbis --version`. If you did not install at all, use `npx -y @memoracompany/orbis --version`.
+If you installed locally instead of globally, use `npx orbis --version`. If you did not install at all, use `npx -y @memoracompany/memora-orbis --version`.
 
 When the CLI starts a server or the `--eval` mode, it makes one request to `https://orbis.memora.company/api/v1/version-check` to check for updates. It has a 1.5-second timeout and never blocks start-up. To turn it off (for example on air-gapped hosts or in CI), set:
 
@@ -137,14 +137,14 @@ Create a project and install Orbis:
 ```bash
 mkdir orbis-hello && cd orbis-hello
 npm init -y
-npm install @memoracompany/orbis
+npm install @memoracompany/memora-orbis
 npm install -D tsx typescript
 ```
 
 Create `index.ts`:
 
 ```typescript
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 async function main() {
   // Starts the engine in this process and a CDP server on port 9222.
@@ -183,7 +183,7 @@ npx tsx index.ts
 The example below uses `setContent()` so it runs offline and gives the same result every time. This is also the best way to write tests for your own agents.
 
 ```typescript
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 const agent = await OrbisAgent.launch({ cdpPort: 9222 });
 try {
@@ -237,15 +237,15 @@ The Python SDK is a small HTTP client. It talks to an Orbis daemon running on No
 Start the daemon in one terminal:
 
 ```bash
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 ```
 
 You should see a banner that includes:
 
 ```text
-  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  ▶ Discovery Endpoint: http://localhost:9222/json/version
-  ▶ Agent Snapshot:     http://localhost:9222/orbis/snapshot (or /memora/snapshot)
+  â–¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  â–¶ Discovery Endpoint: http://localhost:9222/json/version
+  â–¶ Agent Snapshot:     http://localhost:9222/orbis/snapshot (or /memora/snapshot)
 ```
 
 In another terminal, install the SDK and run this script:
@@ -279,7 +279,7 @@ Full API, limits and workarounds: [Python SDK](./python-sdk.md).
 **Playwright or Puppeteer (CDP).** Start the daemon:
 
 ```bash
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 ```
 
 Then connect:
@@ -300,7 +300,7 @@ Orbis does not render pixels. Screenshots return a 1x1 transparent image, and th
 **Selenium (WebDriver).** Start the WebDriver server:
 
 ```bash
-npx -y @memoracompany/orbis serve --protocol webdriver --port 9515
+npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 ```
 
 Then connect. No `chromedriver` is needed:
@@ -325,7 +325,7 @@ Add Orbis to your MCP client configuration. For Claude Desktop, Cursor, Windsurf
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"]
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"]
     }
   }
 }
@@ -334,7 +334,7 @@ Add Orbis to your MCP client configuration. For Claude Desktop, Cursor, Windsurf
 For Claude Code:
 
 ```bash
-claude mcp add orbis -- npx -y @memoracompany/orbis --mcp
+claude mcp add orbis -- npx -y @memoracompany/memora-orbis --mcp
 ```
 
 Restart the client. It gets 15 tools, including `memora_browse`, `memora_act`, `memora_diff` and `memora_fill_form`. By default (`--engine auto`) the MCP server uses Chrome or Edge if one is installed in a standard location, and the built-in engine otherwise.

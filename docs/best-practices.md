@@ -1,8 +1,8 @@
-# Best Practices
+﻿# Best Practices
 
 This guide is for engineers putting Orbis into production: in LLM agent loops, deterministic automation and scheduled jobs. It covers how to structure an agent loop, keep token cost and secret exposure under control, choose locators that survive redesigns, handle errors and waiting, manage resources and concurrency, test offline, log usefully, and automate responsibly. Every behaviour described was checked against the 0.1.0 source or observed at runtime. The helper code was type-checked and run.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -23,8 +23,8 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 The examples import this helper file:
 
 ```ts
-// orbis-helpers.ts — small helpers used throughout this guide
-import { OrbisBrowser, type OrbisPage, type SemanticPageSnapshot } from '@memoracompany/orbis';
+// orbis-helpers.ts â€” small helpers used throughout this guide
+import { OrbisBrowser, type OrbisPage, type SemanticPageSnapshot } from '@memoracompany/memora-orbis';
 
 /** Compact action map for prompts: no CSS selectors, no disabled controls. */
 export function compactActionMap(snap: SemanticPageSnapshot, max = 150): string {
@@ -32,7 +32,7 @@ export function compactActionMap(snap: SemanticPageSnapshot, max = 150): string 
     .filter(a => !a.disabled)
     .slice(0, max)
     .map(a => `[${a.actionId}] ${a.role}${a.isInput && a.type ? `(${a.type})` : ''} "${a.text}"${a.href ? ` -> ${a.href}` : ''}`);
-  const more = snap.actions.length > max ? `\n… ${snap.actions.length - max} more (narrow with focusSelector)` : '';
+  const more = snap.actions.length > max ? `\nâ€¦ ${snap.actions.length - max} more (narrow with focusSelector)` : '';
   return lines.join('\n') + more;
 }
 
@@ -47,7 +47,7 @@ export async function gotoWithRetry(page: OrbisPage, url: string, attempts = 3):
       // ERR_CHALLENGE_* exist in unreleased builds (CAPTCHA / bot check / 429, see challenges.md)
       const final = ['ERR_BLOCKED_BY_ROBOTS', 'ERR_CHALLENGE_DETECTED', 'ERR_CHALLENGE_COOLDOWN'];
       if (final.includes(err.code) || i >= attempts) throw err;
-      const delay = 500 * 2 ** (i - 1) + Math.random() * 250; // 0.5 s, 1 s, 2 s … plus jitter
+      const delay = 500 * 2 ** (i - 1) + Math.random() * 250; // 0.5 s, 1 s, 2 s â€¦ plus jitter
       console.warn(`goto ${url} failed (${err.message}); retry ${i}/${attempts - 1} in ${Math.round(delay)} ms`);
       await new Promise(r => setTimeout(r, delay));
     }
@@ -93,7 +93,7 @@ Rules that prevent most agent failures:
   }
   ```
 
-- **Bound the loop.** Cap the turns (15–25 is typical), cap the characters per tool result, and stop on repeated identical actions.
+- **Bound the loop.** Cap the turns (15â€“25 is typical), cap the characters per tool result, and stop on repeated identical actions.
 - **Treat page text as untrusted input.** Pages can contain prompt-injection text. Keep tools that have effects outside the browser (sending email, payments, file writes) behind human confirmation.
 
 ## 2. Token budgeting
@@ -107,13 +107,13 @@ The full `actionMapText` includes a CSS selector on every line, and on link-dens
 | Hacker News front page | ~35 KB (~8.7k tokens) | ~17,800 tokens (228 actions) |
 | Wikipedia "Web browser" | ~416 KB | ~120,000 tokens (1,230 actions) |
 
-The only published reduction figures (33–40 % fewer tokens than raw HTML, 37 % on average) come from the four small benchmark fixtures in `tests/benchmark.ts`, measured on one Windows 11 laptop on 30 Oct 2026. Don't assume a fixed saving for real sites. Measure your own pages.
+The only published reduction figures (33â€“40 % fewer tokens than raw HTML, 37 % on average) come from the four small benchmark fixtures in `tests/benchmark.ts`, measured on one Windows 11 laptop on 30 Oct 2026. Don't assume a fixed saving for real sites. Measure your own pages.
 
 To keep prompts small:
 
 1. **Send a compact action list, not `actionMapText`.** `compactActionMap()` (above) drops selectors and disabled controls and caps the list length. The model only needs the ID, role, label and link target.
 2. **Scope the content.** `agent.markdown({ focusSelector: 'main', excludeSelectors: ['nav', 'footer', 'aside', '.cookie-banner'] })` trims the page text. The same options on `snapshot()` also trim the action list, but then its `@IDs` can't be used with `act()`/`activate()` (section 1). To shrink the action list itself, filter `snapshot.actions` in code, for example by dropping actions whose `selector` starts inside `nav`, or cap the list as `compactActionMap()` does.
-3. **Truncate Markdown** to a per-turn budget (for example 8–12k characters) and tell the model it was truncated.
+3. **Truncate Markdown** to a per-turn budget (for example 8â€“12k characters) and tell the model it was truncated.
 4. **Send `diff().summary` after small actions** (typing, toggling, revealing a field) instead of a new snapshot. It lists only added, removed and changed controls. Send a full view only after navigation.
 5. **Prefer `extract()` for known data.** If your code knows the selector (`page.extract('.price', 'text')`), don't make the model read the page.
 
@@ -128,7 +128,7 @@ So typing a password and then showing the model the page sends the password to t
 
 - **Fill credentials in code** with `fillForm({ 'label:Email': user, 'label:Password': pass }, 'text=Sign in')`, outside the model's tool loop.
 - **Reuse a saved session** (`saveSession` / `loadSession`) so the agent never sees the login form (see [sessions-and-auth.md](sessions-and-auth.md)).
-- **Scrub values.** Keep a set of the secret strings you typed and replace them in every tool result, as the [use-case 1](use-cases.md#1-llm-research-agent-with-claude-tool-use) tool layer does. Redacting only `value="…"` isn't enough, because the value also appears as the element's text.
+- **Scrub values.** Keep a set of the secret strings you typed and replace them in every tool result, as the [use-case 1](use-cases.md#1-llm-research-agent-with-claude-tool-use) tool layer does. Redacting only `value="â€¦"` isn't enough, because the value also appears as the element's text.
 
 Also keep session files, `memora_session` paths and debug logs that contain action maps out of version control and out of shared log stores.
 
@@ -173,7 +173,7 @@ What fails, and how:
 Guidelines:
 
 - **Retry only transient failures** (network errors, timeouts, 5xx) with exponential backoff and jitter. Never retry robots blocks, 4xx responses, or failures caused by your own selectors. `gotoWithRetry()` above implements this.
-- **Treat `false` and `skipped` as errors in scripts.** Throw with context (`fields not found: …`) so a redesign fails loudly.
+- **Treat `false` and `skipped` as errors in scripts.** Throw with context (`fields not found: â€¦`) so a redesign fails loudly.
 - **Read script errors when content is missing.** `scriptErrors(page)` usually explains a missing dropdown or empty list, for example a page using `element.style`, `XMLHttpRequest` or `getComputedStyle`, which the engine doesn't provide (see [limitations.md](limitations.md)).
 - **Return errors to the model as tool errors** (`is_error: true`) with the message, so it can choose another path instead of the loop crashing.
 
@@ -181,7 +181,7 @@ Guidelines:
 
 Orbis has no rendering loop to wait for. What matters is the page's JavaScript.
 
-- **`goto()` already waits.** After loading the HTML and running scripts, it waits up to `settleTimeoutMs` (default 5,000 ms, never past the navigation timeout) until in-flight `fetch()` calls, their promise chains and short one-shot timers (≤ 1 s, nesting ≤ 10) have finished. `setInterval` and long timeouts are ignored. Tune it per call (`goto(url, { settleTimeoutMs: 0 })` for metadata-only work) or per page (`page.settleTimeoutMs = 2000`).
+- **`goto()` already waits.** After loading the HTML and running scripts, it waits up to `settleTimeoutMs` (default 5,000 ms, never past the navigation timeout) until in-flight `fetch()` calls, their promise chains and short one-shot timers (â‰¤ 1 s, nesting â‰¤ 10) have finished. `setInterval` and long timeouts are ignored. Tune it per call (`goto(url, { settleTimeoutMs: 0 })` for metadata-only work) or per page (`page.settleTimeoutMs = 2000`).
 - **After an interaction that starts async work**, wait for the result you need:
 
   ```ts
@@ -217,7 +217,7 @@ The pattern that works:
 - **Bounded parallelism** with a small limiter:
 
 ```ts
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 /** Run tasks with at most `limit` in flight. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -259,17 +259,17 @@ Things to know:
 - **CPU work blocks the event loop.** HTML parsing, snapshotting and page scripts run synchronously on the Node.js main thread. A single process mostly gives you concurrency while waiting on the network. For CPU-bound throughput, run several worker processes (or containers) and spread URLs across them.
 - **Context Isolation for Multi-Agent Fleets (0.1.1):** Use `browser.newContext()` or `agent.newContext()` when running parallel workers. Each context creates an isolated `CookieJar` with domain and path scoping, preventing session leaks between concurrent tasks.
 - **Daemons are shared state.** Every CDP, REST or Python client of a daemon sees the same page list, and the Python SDK and REST endpoints act on the daemon's *default page*. Run one daemon per worker. Don't put a single daemon behind a load balancer for unrelated users.
-- **Be a good neighbour.** Concurrency against a single host should stay low (2–4 pages) unless the site owner agrees otherwise.
+- **Be a good neighbour.** Concurrency against a single host should stay low (2â€“4 pages) unless the site owner agrees otherwise.
 
 ## 9. Testing your agent offline with setContent()
 
 `page.setContent(html, url)` loads HTML without touching the network and runs its inline scripts. Use it to unit-test prompts, tool layers and selectors in CI, quickly and deterministically:
 
 ```ts
-// agent.test.ts — offline tests for agent logic with setContent() fixtures
+// agent.test.ts â€” offline tests for agent logic with setContent() fixtures
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OrbisAgent, OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const LOGIN = `<!DOCTYPE html><html><head><title>Sign in</title></head><body>
   <form action="/session" method="post">
@@ -339,7 +339,7 @@ console.log(JSON.stringify({
 - **Don't log action maps or diffs at info level.** They contain typed values, including passwords (section 3).
 - Debug switches: `DEBUG_CDP=1` logs CDP traffic on the daemon, and `DEBUG_WEBDRIVER=1` logs WebDriver requests to stderr.
 - Set `ORBIS_NO_TELEMETRY=1` in production and CI. It skips the start-up update check that the CLI sends to `orbis.memora.company`, which matters for air-gapped networks and for MCP (whose protocol uses stdout).
-- Robots blocks are written to stderr (`[Memora] blocked by robots.txt: …`). Route stderr to your log pipeline.
+- Robots blocks are written to stderr (`[Memora] blocked by robots.txt: â€¦`). Route stderr to your log pipeline.
 
 ## Responsible automation
 

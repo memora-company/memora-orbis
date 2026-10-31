@@ -2,7 +2,7 @@
 
 These are production-style recipes for Orbis. Each one covers the problem, when Orbis fits it (and when it doesn't), complete code, the output you should expect, and notes for running it in production. Unless a recipe says otherwise, every TypeScript sample was type-checked against the 0.1.0 type definitions and run end to end against local fixture pages that mimic the target sites. The **Verified** line on each recipe says exactly what was run.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -30,8 +30,8 @@ Orbis's native engine parses HTML and runs page JavaScript in a sandbox. It has 
 Spend 30 seconds checking a target before you build on it:
 
 ```bash
-npx -y @memoracompany/orbis fetch https://target.example.com/page --dump action_map
-npx -y @memoracompany/orbis fetch https://target.example.com/page --dump markdown --dump-max-bytes 2000
+npx -y @memoracompany/memora-orbis fetch https://target.example.com/page --dump action_map
+npx -y @memoracompany/memora-orbis fetch https://target.example.com/page --dump markdown --dump-max-bytes 2000
 ```
 
 If the action map and the Markdown contain what a person would see, Orbis fits. If they're empty or show only a loading shell, check the page's script errors from the SDK:
@@ -50,14 +50,14 @@ The engine also doesn't support `<iframe>` content, canvas or WebGL, screenshots
 ```bash
 mkdir orbis-recipes && cd orbis-recipes
 npm init -y && npm pkg set type=module
-npm install @memoracompany/orbis
+npm install @memoracompany/memora-orbis
 npm install -D tsx typescript @types/node
 npx tsx price-watch.ts
 ```
 
 The samples use `new OrbisBrowser()` and `new OrbisAgent(browser, page)` instead of `OrbisAgent.launch()`. `launch()` also starts a CDP server, which listens on all network interfaces with no authentication enforced (see [security.md](security.md)). A script that only drives pages in-process doesn't need that open port.
 
-Python samples need a running daemon (`npx -y @memoracompany/orbis --port 9222 --host 127.0.0.1`) and `pip install memora-orbis`. See [python-sdk.md](python-sdk.md).
+Python samples need a running daemon (`npx -y @memoracompany/memora-orbis --port 9222 --host 127.0.0.1`) and `pip install memora-orbis`. See [python-sdk.md](python-sdk.md).
 
 ---
 
@@ -75,7 +75,7 @@ Python samples need a running daemon (`npx -y @memoracompany/orbis --port 9222 -
 
 ```ts
 // browser-tools.ts â€” Orbis-backed tools for an LLM agent
-import { OrbisAgent, OrbisBrowser, type SemanticPageSnapshot } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser, type SemanticPageSnapshot } from '@memoracompany/memora-orbis';
 
 const MAX_VIEW_CHARS = 12_000; // hard cap on what one tool result may add to the context
 const NOISE = ['nav', 'footer', 'aside', '.cookie-banner', '[role="banner"]']; // stripped from page content
@@ -384,7 +384,7 @@ if __name__ == "__main__":
 ```ts
 // ingest-docs.ts â€” turn documentation pages into RAG-ready JSONL chunks
 import { appendFileSync, writeFileSync } from 'node:fs';
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const URLS = (process.env.DOC_URLS ?? 'https://docs.example.com/guide,https://docs.example.com/api').split(',');
 const OUT = process.env.OUT ?? 'docs.jsonl';
@@ -449,7 +449,7 @@ console.log(`wrote ${written} chunks to ${OUT}`);
 **One-off pages from the shell.** Run this for a single page:
 
 ```bash
-npx -y @memoracompany/orbis fetch https://docs.example.com/guide --dump markdown > guide.md
+npx -y @memoracompany/memora-orbis fetch https://docs.example.com/guide --dump markdown > guide.md
 ```
 
 The CLI has no focus or exclude options for Markdown. `--dump-selector main` returns the element's **raw text** (headings and paragraphs run together), not Markdown. Use the SDK, or the daemon's `GET /orbis/snapshot?format=markdown&focus=main&exclude=nav,footer` endpoint ([http-api.md](http-api.md)), when you need focused Markdown.
@@ -475,7 +475,7 @@ The CLI has no focus or exclude options for Markdown. `--dump-selector main` ret
 
 ```ts
 // seo-audit.ts â€” metadata checks for a list of URLs; exits 1 when any page has errors (CI-friendly)
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const URLS = (process.env.AUDIT_URLS ?? 'https://shop.example.com/product/1').split(',');
 const browser = new OrbisBrowser();
@@ -530,7 +530,7 @@ process.exit(findings.some(f => f.level === 'error') ? 1 : 0);
 **Shell version.** Pipe the structured data through `jq`:
 
 ```bash
-npx -y @memoracompany/orbis fetch https://shop.example.com/product/1 --dump structured_data \
+npx -y @memoracompany/memora-orbis fetch https://shop.example.com/product/1 --dump structured_data \
   | jq '{title, description, canonical, og: .openGraph, types: [.jsonLd[]."@type"]}'
 ```
 
@@ -570,7 +570,7 @@ npx -y @memoracompany/orbis fetch https://shop.example.com/product/1 --dump stru
 ```ts
 // price-watch.ts â€” detect price / stock changes and notify a webhook
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const PRODUCTS = (process.env.PRODUCT_URLS ?? 'https://shop.example.com/product/1').split(',');
 const STATE_FILE = process.env.STATE_FILE ?? 'price-state.json';
@@ -651,7 +651,7 @@ https://shop.example.com/product/1: 129 -> 99.5 USD; stock "In stock" -> "Only 2
 ```ts
 // dashboard-report.ts â€” log in once, reuse the saved session on later runs
 import { chmodSync, existsSync } from 'node:fs';
-import { OrbisAgent, OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const BASE = process.env.DASH_URL ?? 'https://ops.internal.example.com';
 const SESSION_FILE = process.env.SESSION_FILE ?? '.secrets/ops-dashboard-session.json';
@@ -729,7 +729,7 @@ The session file is plain JSON:
 
 ```ts
 // register-wizard.ts â€” dependent dropdowns + a two-step form
-import { OrbisAgent, OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const URL_ = process.env.WIZARD_URL ?? 'https://portal.example.com/wizard';
 const browser = new OrbisBrowser();
@@ -875,7 +875,7 @@ jobs:
       - run: pip install selenium pytest
       - name: Start Orbis WebDriver server
         run: |
-          npx -y @memoracompany/orbis serve --protocol webdriver --port 4444 --host 127.0.0.1 > orbis.log 2>&1 &
+          npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 4444 --host 127.0.0.1 > orbis.log 2>&1 &
           curl --retry 20 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:4444/status
         env: { ORBIS_NO_TELEMETRY: '1' }
       - name: Start the app under test
@@ -938,7 +938,7 @@ try {
 Start the daemon next to the job:
 
 ```bash
-ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/orbis --port 9222 --host 127.0.0.1
+ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/memora-orbis --port 9222 --host 127.0.0.1
 ```
 
 **What to watch for (all observed on 0.1.0).**
@@ -973,7 +973,7 @@ ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/orbis --port 9222 --host 127.0.0.1
 Claude Code:
 
 ```bash
-claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/orbis --mcp --engine chrome
+claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/memora-orbis --mcp --engine chrome
 ```
 
 Cursor (`.cursor/mcp.json` in the project) or Claude Desktop (`claude_desktop_config.json`):
@@ -983,7 +983,7 @@ Cursor (`.cursor/mcp.json` in the project) or Claude Desktop (`claude_desktop_co
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp", "--engine", "native"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp", "--engine", "native"],
       "env": { "ORBIS_NO_TELEMETRY": "1" }
     }
   }
@@ -1026,7 +1026,7 @@ Example prompts:
 
 ```ts
 // polite-crawler.ts â€” same-origin crawl that honours robots.txt and rate limits itself
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const START = process.env.START_URL ?? 'https://docs.example.com/guide';
 const MAX_PAGES = Number(process.env.MAX_PAGES ?? 200);
@@ -1087,7 +1087,7 @@ console.log(JSON.stringify(report, null, 2));
 The same rules from the CLI:
 
 ```bash
-npx -y @memoracompany/orbis fetch https://docs.example.com/private/x \
+npx -y @memoracompany/memora-orbis fetch https://docs.example.com/private/x \
   --obey-robots --robots-agent AcmeResearchBot \
   --user-agent "AcmeResearchBot/1.0 (+https://acme.example/bot)"
 # stderr: Fetch error: Blocked by robots.txt: â€¦ ; exit code 1
@@ -1122,7 +1122,7 @@ npx -y @memoracompany/orbis fetch https://docs.example.com/private/x \
 
 ```ts
 // explore-filters.ts â€” try several filter combinations from one loaded state
-import { OrbisAgent, OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const SEARCH_URL = process.env.SEARCH_URL ?? 'https://catalog.example.com/search?q=kettle';
 const browser = new OrbisBrowser();
@@ -1191,7 +1191,7 @@ original page untouched: https://catalog.example.com/search?q=kettle
 
 ```ts
 // company-contacts.ts â€” find published business contact channels on company websites
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const SITES = (process.env.SITES ?? 'https://acme.example').split(',');
 const CONTACT_LINK = /contact|about|impressum|team|support/i;
@@ -1274,7 +1274,7 @@ console.log(JSON.stringify(out, null, 2));
 
 ```ts
 // status-check.ts â€” exit 0 = healthy, 1 = degraded component, 2 = page unreachable / HTTP error
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const STATUS_URL = process.env.STATUS_URL ?? 'https://status.internal.example.com/';
 const browser = new OrbisBrowser({ network: { timeoutMs: 15_000 } });

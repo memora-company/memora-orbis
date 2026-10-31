@@ -1,4 +1,4 @@
-# Contributing to Orbis
+﻿# Contributing to Orbis
 
 Thank you for your interest in contributing to Orbis by Memora! We welcome community contributions, examples, documentation improvements, framework adapters, and bug reports.
 
@@ -29,10 +29,10 @@ Thank you for your interest in contributing to Orbis by Memora! We welcome commu
 
 The documentation in [`docs/`](docs/README.md) is meant to be safe to rely on in production. Please keep it that way:
 
-- **Verify every claim against the released package.** Run code samples against the published `@memoracompany/orbis` / `memora-orbis` version before submitting. If you describe a behaviour, say which version you tested.
+- **Verify every claim against the released package.** Run code samples against the published `@memoracompany/memora-orbis` / `memora-orbis` version before submitting. If you describe a behaviour, say which version you tested.
 - **No unmeasured numbers.** Performance figures must come from a measurement you can describe (machine, date, method). Otherwise leave them out.
 - **Document limitations openly.** Mark bugs with a `> **Known issue (x.y.z):**` callout and add them to [`docs/limitations.md`](docs/limitations.md) with a workaround.
-- **Use the real names.** npm package `@memoracompany/orbis` (`npx -y @memoracompany/orbis`), CLI binary `orbis`, PyPI package `memora-orbis` (`from orbis import OrbisAgent`). Flags such as `--cdp`, `--webdriver`, `--stealth` and `--headless` do not exist.
+- **Use the real names.** npm package `@memoracompany/memora-orbis` (`npx -y @memoracompany/memora-orbis`), CLI binary `orbis`, PyPI package `memora-orbis` (`from orbis import OrbisAgent`). Flags such as `--cdp`, `--webdriver`, `--stealth` and `--headless` do not exist.
 - **Make examples deterministic.** Prefer a small local web server or `page.setContent()` over third-party sites, so examples work offline and in CI.
 - **Keep secrets out of examples.** Read credentials from environment variables, and never commit session files.
 

@@ -10,7 +10,7 @@
     "python": "python selenium_demo.py"
   },
   "dependencies": {
-    "@memoracompany/orbis": "^0.1.1",
+    "@memoracompany/memora-orbis": "^0.1.1",
     "selenium-webdriver": "^4.19.0"
   },
   "devDependencies": {

@@ -1,8 +1,8 @@
-# Playwright and Puppeteer over CDP
+﻿# Playwright and Puppeteer over CDP
 
 Orbis serves a subset of the Chrome DevTools Protocol (CDP). Playwright's `chromium.connectOverCDP()` and Puppeteer's `puppeteer.connect()` can attach to it and drive pages through their normal APIs: navigation, selectors, `fill`, `click`, `evaluate`, extra headers. The engine underneath is not Chrome. It is the native Orbis engine, an HTML parser and DOM with a V8 script sandbox and no rendering. Code that depends on pixels, layout, frames or uploads behaves differently. This page shows how to connect, lists exactly which CDP methods are implemented, and records what was verified to work and fail against the 0.1.0 build.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -23,7 +23,7 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 ## Start the daemon
 
 ```bash
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 ```
 
 CDP is the default protocol, so `orbis --port 9222` and `orbis serve --protocol cdp --port 9222` are equivalent. There are no `--cdp`, `--headless` or `--stealth` flags. Orbis is always headless and stealth is on by default (`--no-stealth` turns it off). See [cli-reference.md](./cli-reference.md).
@@ -31,8 +31,8 @@ CDP is the default protocol, so `orbis --port 9222` and `orbis serve --protocol 
 The banner prints the endpoints:
 
 ```
-  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  ▶ Discovery Endpoint: http://localhost:9222/json/version
+  â–¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  â–¶ Discovery Endpoint: http://localhost:9222/json/version
 ```
 
 > **Security:** with `--host localhost` (the default) or `--host 127.0.0.1`, the server actually listens on `0.0.0.0`, which is every network interface. No authentication is enforced. Anyone who can reach the port can drive the browser, read the page and use the session endpoints to read and write JSON files on the host. Firewall the port, or run the daemon in an isolated network namespace. See [security.md](./security.md).
@@ -123,7 +123,7 @@ Verified against the 0.1.0 build with Playwright 1.5x over CDP unless marked "by
 | `context.newPage()`, `browser.newContext()` | Works | Contexts are logical. They do not isolate storage (see below). |
 | `context.cookies()` | Returns `[]` | `Network.getCookies` / `Storage.getCookies` always return an empty list. |
 | `context.addCookies()` | Silently ignored | No error, but the cookie is not sent (verified). Set cookies via `document.cookie` in `evaluate`, or use the Orbis session APIs. |
-| `page.screenshot()`, `locator.screenshot()` | Returns a 1×1 transparent PNG | No rendering engine. The call succeeds so tools do not crash, but the image is blank. |
+| `page.screenshot()`, `locator.screenshot()` | Returns a 1Ã—1 transparent PNG | No rendering engine. The call succeeds so tools do not crash, but the image is blank. |
 | `page.pdf()` | Fails | Throws a type error inside Playwright (no PDF data returned). |
 | `setInputFiles` (file upload) | Fails | `DOM.setFileInputFiles` throws "File uploads are not supported". |
 | `setViewportSize`, device emulation, geolocation, timezone, media | No effect | `Emulation.*` returns `{}`. Viewport metrics are fixed. |
@@ -206,7 +206,7 @@ From `src/cdp/dispatcher.ts`. Any method in an unlisted domain returns `{}` with
 | Domain | Methods with behaviour |
 | :--- | :--- |
 | `Target` | `getTargets`, `createTarget`, `closeTarget`, `attachToTarget`, `detachFromTarget`, `setAutoAttach`, `setDiscoverTargets`, `getTargetInfo`, `createBrowserContext`, `getBrowserContexts`, `disposeBrowserContext` |
-| `Page` | `enable`, `getFrameTree`, `getResourceTree`, `addScriptToEvaluateOnNewDocument`, `removeScriptToEvaluateOnNewDocument`, `setLifecycleEventsEnabled`, `createIsolatedWorld`, `navigate`, `reload`, `stopLoading`, `getNavigationHistory`, `navigateToHistoryEntry`, `getLayoutMetrics` (fixed viewport), `captureScreenshot` (1×1 PNG) |
+| `Page` | `enable`, `getFrameTree`, `getResourceTree`, `addScriptToEvaluateOnNewDocument`, `removeScriptToEvaluateOnNewDocument`, `setLifecycleEventsEnabled`, `createIsolatedWorld`, `navigate`, `reload`, `stopLoading`, `getNavigationHistory`, `navigateToHistoryEntry`, `getLayoutMetrics` (fixed viewport), `captureScreenshot` (1Ã—1 PNG) |
 | `Runtime` | `enable`, `evaluate` (`returnByValue`, `awaitPromise`), `callFunctionOn`, `getProperties`, `releaseObject`, `releaseObjectGroup`, `runIfWaitingForDebugger` |
 | `DOM` | `enable`, `disable`, `getDocument`, `querySelector`, `querySelectorAll`, `getOuterHTML`, `describeNode`, `resolveNode`, `requestNode`, `scrollIntoViewIfNeeded`, `getContentQuads`, `getBoxModel` (synthetic layout), `focus`, `setFileInputFiles` (throws) |
 | `Network` | `enable`, `setExtraHTTPHeaders`, `getCookies` / `getAllCookies` (always empty), `getResponseBody` (main document only) |
@@ -264,7 +264,7 @@ async function waitForPort(port: number, timeoutMs = 10_000) {
 export const test = base.extend<{}, { orbis: Browser }>({
   orbis: [async ({}, use, workerInfo) => {
     const port = 9400 + workerInfo.workerIndex;
-    const proc: ChildProcess = spawn('npx', ['-y', '@memoracompany/orbis', '--port', String(port)], {
+    const proc: ChildProcess = spawn('npx', ['-y', '@memoracompany/memora-orbis', '--port', String(port)], {
       env: { ...process.env, ORBIS_NO_TELEMETRY: '1' },
       stdio: 'ignore',
       shell: process.platform === 'win32',

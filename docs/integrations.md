@@ -2,7 +2,7 @@
 
 This page shows how to connect Orbis to agent frameworks and LLM APIs: LangChain (TypeScript and Python), Browser-Use, Stagehand, CrewAI, AutoGen, OpenAI-style function calling, and a complete Claude tool-use loop. For each one it states which Orbis surface it uses (the TypeScript SDK, the Python SDK over HTTP, CDP or MCP) and what was verified for 0.1.0. Integrations that depend on a full Chrome (screenshots, accessibility trees, layout) carry clear warnings.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -66,11 +66,11 @@ The built-in tools return the full `actionMapText`, which includes a CSS selecto
 Because these objects have no input schema, wrap them in `DynamicStructuredTool` so tool-calling models receive proper JSON schemas:
 
 ```bash
-npm install @memoracompany/orbis @langchain/core zod
+npm install @memoracompany/memora-orbis @langchain/core zod
 ```
 
 ```typescript
-import { OrbisAgent, createOrbisLangChainTools } from '@memoracompany/orbis';
+import { OrbisAgent, createOrbisLangChainTools } from '@memoracompany/memora-orbis';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 
@@ -168,7 +168,7 @@ A complete, minimal agent loop in Python. It uses the Anthropic SDK with a manua
 
 ```bash
 pip install anthropic memora-orbis
-npx -y @memoracompany/orbis --port 9222     # in another terminal
+npx -y @memoracompany/memora-orbis --port 9222     # in another terminal
 export ANTHROPIC_API_KEY=...                 # or sign in with `ant auth login`
 ```
 
@@ -375,7 +375,7 @@ AutoGen derives the schemas from type hints and docstrings, so keep both accurat
 Browser-Use drives a browser over CDP. Orbis exposes a CDP endpoint and a helper that returns connection settings:
 
 ```typescript
-import { getBrowserUseConfig } from '@memoracompany/orbis';
+import { getBrowserUseConfig } from '@memoracompany/memora-orbis';
 getBrowserUseConfig(9222);
 // { cdpUrl: 'http://localhost:9222', disableSecurity: true,
 //   extraChromiumArgs: ['--disable-blink-features=AutomationControlled', '--no-sandbox'] }
@@ -396,7 +396,7 @@ Pass `cdp_url` to whichever Browser-Use class accepts a CDP URL in your Browser-
 ## Stagehand
 
 ```typescript
-import { OrbisAgent, getStagehandConfig } from '@memoracompany/orbis';
+import { OrbisAgent, getStagehandConfig } from '@memoracompany/memora-orbis';
 
 const agent = await OrbisAgent.launch({ cdpPort: 9222 });
 const config = getStagehandConfig(agent);
@@ -412,7 +412,7 @@ Map `localBrowserUrl` to the CDP URL option of your Stagehand version (for examp
 Many frameworks can load MCP servers directly (LangChain MCP adapters, the OpenAI Agents SDK, Claude Code, Cursor). Point them at the stdio command:
 
 ```bash
-npx -y @memoracompany/orbis --mcp --engine native
+npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
 You get 15 tools with descriptions and schemas, link-following clicks (`memora_act` performs default actions), extraction, metadata and sessions. Read the security section of [mcp.md](./mcp.md#security) first, especially for `memora_eval` and `memora_session`.

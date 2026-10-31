@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Example 02: Playwright over CDP, backed by Orbis
  *
  * Start the Orbis daemon first (separate terminal):
- *   npx -y @memoracompany/orbis --port 9222
+ *   npx -y @memoracompany/memora-orbis --port 9222
  *
  * Then run: npm install && npm start
  *
@@ -41,7 +41,7 @@ async function main() {
   try {
     browser = await chromium.connectOverCDP(CDP_URL);
   } catch {
-    console.error(`Could not connect to Orbis at ${CDP_URL}. Start it first:\n  npx -y @memoracompany/orbis --port 9222`);
+    console.error(`Could not connect to Orbis at ${CDP_URL}. Start it first:\n  npx -y @memoracompany/memora-orbis --port 9222`);
     site.close();
     process.exit(1);
   }

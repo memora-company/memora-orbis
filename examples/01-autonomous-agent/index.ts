@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Example 01: Agent building blocks with the Orbis TypeScript SDK
  *
  * Runs against a small local web app started by this script, so it works offline
@@ -13,7 +13,7 @@
  * Run: npm install && npm start
  */
 import http from 'node:http';
-import { OrbisAgent, type SemanticPageSnapshot } from '@memoracompany/orbis';
+import { OrbisAgent, type SemanticPageSnapshot } from '@memoracompany/memora-orbis';
 
 const PORT = 18091;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -90,7 +90,7 @@ async function main() {
   try {
     // 1. Load the login page
     const login = await agent.goto(`${BASE}/login`);
-    console.log(`1. Loaded "${login.title}" — ${login.interactiveCount} actions, ~${login.tokenEstimate} tokens`);
+    console.log(`1. Loaded "${login.title}" â€” ${login.interactiveCount} actions, ~${login.tokenEstimate} tokens`);
     console.log(login.actionMapText, '\n');
 
     // 2. Compact map you would give to a language model

@@ -1,8 +1,8 @@
-# Production Deployment
+﻿# Production Deployment
 
 This guide explains how to run Orbis reliably in production: which runtime mode to choose, how Orbis uses processes and memory, how to package it for Docker, Kubernetes, systemd and PM2, which timeouts apply, how to observe it, and what to check before going live. Read it together with [security.md](./security.md). The Orbis server has no working authentication in 0.1.0 and listens on every network interface by default, so network isolation is required.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -98,7 +98,7 @@ ENV NODE_ENV=production \
     ORBIS_NO_TELEMETRY=1
 
 # Install the published package globally (registers the `orbis` binary)
-RUN npm install -g @memoracompany/orbis@0.1.0 && npm cache clean --force
+RUN npm install -g @memoracompany/memora-orbis@0.1.0 && npm cache clean --force
 
 # Writable directory for session files only
 RUN mkdir -p /data/sessions && chown -R node:node /data
@@ -361,11 +361,11 @@ sudo mkdir -p /var/lib/orbis/sessions && sudo chown -R orbis:orbis /var/lib/orbi
 sudo systemctl daemon-reload && sudo systemctl enable --now orbis
 ```
 
-Find the binary path with `which orbis` after `npm i -g @memoracompany/orbis`.
+Find the binary path with `which orbis` after `npm i -g @memoracompany/memora-orbis`.
 
 > **Known issue (0.1.0):** passing `--host localhost` or `--host 127.0.0.1` makes Orbis listen on `0.0.0.0` (all interfaces). To listen on one interface only, pass that interface's IP, for example `--host 10.0.0.5`. For loopback-only access, use `--host 127.0.0.2`. It is a loopback address that Orbis does not rewrite. It works out of the box on Linux and Windows; on macOS, first run `sudo ifconfig lo0 alias 127.0.0.2`. Clients then connect to `http://127.0.0.2:<port>`. Either way, also firewall the port.
 
-> **Known issue (0.1.0):** do not pass an IPv6 literal such as `--host ::1`. The server starts, but the first HTTP request crashes the process (`new URL('http://::1:…')` is invalid), and the advertised `webSocketDebuggerUrl` is malformed.
+> **Known issue (0.1.0):** do not pass an IPv6 literal such as `--host ::1`. The server starts, but the first HTTP request crashes the process (`new URL('http://::1:â€¦')` is invalid), and the advertised `webSocketDebuggerUrl` is malformed.
 
 ## 7. PM2
 
@@ -375,7 +375,7 @@ module.exports = {
   apps: [
     {
       name: 'orbis-worker-1',
-      script: 'orbis',                 // global binary from npm i -g @memoracompany/orbis
+      script: 'orbis',                 // global binary from npm i -g @memoracompany/memora-orbis
       interpreter: 'none',
       args: '--port 9301 --host 127.0.0.2',
       env: { NODE_ENV: 'production', ORBIS_NO_TELEMETRY: '1' },
@@ -402,9 +402,9 @@ Do not use PM2 cluster mode (`exec_mode: 'cluster'`). Clustered workers share on
 
 | Mode | Signal handling |
 | :--- | :--- |
-| CDP daemon | `SIGINT`/`SIGTERM` → prints `Shutting down browser server...`, closes the WebSocket and HTTP servers, closes all pages, exits 0. Closing the HTTP server waits for open keep-alive connections, so set a stop timeout (`TimeoutStopSec`, `terminationGracePeriodSeconds`, `kill_timeout`). |
-| WebDriver daemon | `SIGINT`/`SIGTERM` → closes every session, force-closes connections, exits 0. |
-| MCP | `SIGINT`/`SIGTERM` → closes the engine (including a launched Chrome in Chrome mode), exits 0. |
+| CDP daemon | `SIGINT`/`SIGTERM` â†’ prints `Shutting down browser server...`, closes the WebSocket and HTTP servers, closes all pages, exits 0. Closing the HTTP server waits for open keep-alive connections, so set a stop timeout (`TimeoutStopSec`, `terminationGracePeriodSeconds`, `kill_timeout`). |
+| WebDriver daemon | `SIGINT`/`SIGTERM` â†’ closes every session, force-closes connections, exits 0. |
+| MCP | `SIGINT`/`SIGTERM` â†’ closes the engine (including a launched Chrome in Chrome mode), exits 0. |
 | In-process SDK | Your responsibility: `await agent.close()` or `browser.close()`. |
 
 There is no built-in memory cap and no automatic page eviction for CDP/REST pages. Pages created with `/json/new` or by CDP clients stay in memory until closed (`/json/close/<id>`, `Target.closeTarget`, `page.close()` in Playwright). Recommended practice:
@@ -439,9 +439,9 @@ There is no built-in memory cap and no automatic page eviction for CDP/REST page
 | Signal | How to get it |
 | :--- | :--- |
 | CDP traffic | `DEBUG_CDP=1` logs every CDP request, response and event (method names, ids, session ids) to stdout. Very verbose, so enable it only when debugging. |
-| WebDriver traffic | `DEBUG_WEBDRIVER=1` writes `[WebDriver] METHOD /path body…` (first 200 bytes) to stderr |
+| WebDriver traffic | `DEBUG_WEBDRIVER=1` writes `[WebDriver] METHOD /path bodyâ€¦` (first 200 bytes) to stderr |
 | Page console | SDK: `page.getLogs()` / `page.clearLogs()`; MCP: `memora_console`; Chrome engine: browser console messages |
-| Script errors | Logged into the page console (`Uncaught …`, `Failed to load script …`, `Script terminated after 5000ms`) |
+| Script errors | Logged into the page console (`Uncaught â€¦`, `Failed to load script â€¦`, `Script terminated after 5000ms`) |
 | robots.txt blocks | `[Memora] blocked by robots.txt: <url>` on stderr; the navigation throws `RobotsBlockedError` (`code: 'ERR_BLOCKED_BY_ROBOTS'`) |
 | Health | CDP: `GET /json/version` (200 JSON). WebDriver: `GET /status` (`value.ready`). |
 | Process metrics | Use your platform: container memory/CPU, Node.js RSS. Orbis has no metrics endpoint. |
@@ -470,7 +470,7 @@ export ORBIS_NO_TELEMETRY=1
 Smoke-check a deployment with the `fetch` subcommand. It exits with code 1 when the request fails:
 
 ```bash
-npx -y @memoracompany/orbis fetch https://staging.example.com/health --dump action_map --http-timeout 15000
+npx -y @memoracompany/memora-orbis fetch https://staging.example.com/health --dump action_map --http-timeout 15000
 ```
 
 Do not rely on `--eval` in CI. It prints errors but always exits 0.
@@ -489,7 +489,7 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: npm install -g @memoracompany/orbis@0.1.0
+      - run: npm install -g @memoracompany/memora-orbis@0.1.0
       - name: Start Orbis WebDriver
         run: |
           orbis serve --protocol webdriver --port 9515 > orbis.log 2>&1 &
@@ -530,7 +530,7 @@ Reliability
 - [ ] One daemon per Python agent, or WebDriver sessions, or in-process pages. No shared default page between agents.
 - [ ] Pages are closed after each job; daemons are recycled on a schedule or memory threshold.
 - [ ] Health checks use `/json/version` (CDP) or `/status` (WebDriver).
-- [ ] The stop timeout is at least 15–30 s.
+- [ ] The stop timeout is at least 15â€“30 s.
 - [ ] Navigation timeouts are set per call (`page.goto(url, { timeoutMs })`), not through `--http-timeout`.
 - [ ] Your wrapper catches navigation errors, timeouts and `RobotsBlockedError`.
 
@@ -540,5 +540,5 @@ Compliance and operations
 - [ ] `--obey-robots` is enabled for crawling, with a `--robots-agent` token that identifies you (see [network-and-proxies.md](./network-and-proxies.md#robotstxt)).
 - [ ] The target sites' terms of service permit automated access.
 - [ ] `ORBIS_NO_TELEMETRY=1` is set where outbound calls are not allowed, and in MCP configs.
-- [ ] The package version is pinned (`@memoracompany/orbis@0.1.0`).
+- [ ] The package version is pinned (`@memoracompany/memora-orbis@0.1.0`).
 - [ ] You have reviewed [limitations.md](./limitations.md) for features your workflow depends on (iframes, shadow DOM, screenshots, file upload).

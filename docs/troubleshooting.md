@@ -2,7 +2,7 @@
 
 This page lists the problems people commonly run into with Orbis 0.1.0. Each entry gives the symptom, the verified cause, and the fix. Search this page for the exact error message you see. If your problem is not listed, check [limitations.md](./limitations.md) to see whether the feature is supported at all.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -23,18 +23,18 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ### `npx memora-orbis` fails with `404 Not Found`
 
-**Cause:** there is no npm package called `memora-orbis`. `memora-orbis` is a *binary name* inside the `@memoracompany/orbis` package (and the name of the PyPI package).
+**Cause:** there is no npm package called `memora-orbis`. `memora-orbis` is a *binary name* inside the `@memoracompany/memora-orbis` package (and the name of the PyPI package).
 
 **Fix:**
 
 ```bash
-npx -y @memoracompany/orbis --version
+npx -y @memoracompany/memora-orbis --version
 ```
 
 Alternatively, install globally and use any of the binaries `orbis`, `memora-orbis` or `memora-browser` (the last one is deprecated):
 
 ```bash
-npm install -g @memoracompany/orbis
+npm install -g @memoracompany/memora-orbis
 ```
 
 ### `Port 9222 is already in use by another process.`
@@ -229,14 +229,14 @@ Every REST call uses the daemon's single default page. Run **one daemon per agen
 
 Check, in order:
 
-1. **Package name.** Use `"command": "npx", "args": ["-y", "@memoracompany/orbis", "--mcp"]`. `npx memora-orbis` fails (404).
+1. **Package name.** Use `"command": "npx", "args": ["-y", "@memoracompany/memora-orbis", "--mcp"]`. `npx memora-orbis` fails (404).
 2. **Node.js on the client's PATH.** GUI apps often don't inherit your shell PATH. Use the absolute path to `npx` (`which npx` / `where npx`), or install globally and use `"command": "orbis", "args": ["--mcp"]` with an absolute path.
 3. **Valid JSON** in the config file (no trailing commas). Restart the client completely after editing.
-4. **The first start can be slow** while `npx` downloads the package. Run `npx -y @memoracompany/orbis --version` once beforehand.
+4. **The first start can be slow** while `npx` downloads the package. Run `npx -y @memoracompany/memora-orbis --version` once beforehand.
 5. **Test the server by hand.** You should get two JSON responses:
 
 ```bash
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | npx -y @memoracompany/orbis --mcp --engine native
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
 6. **Stray stdout output.** Add `"env": { "ORBIS_NO_TELEMETRY": "1" }`. If an update is announced, the update notice is printed on stdout, which is the MCP channel.

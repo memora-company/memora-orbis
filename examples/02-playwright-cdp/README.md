@@ -1,4 +1,4 @@
-# Example 02: Playwright over CDP
+﻿# Example 02: Playwright over CDP
 
 Connect an existing [Playwright](https://playwright.dev/) script to Orbis with `chromium.connectOverCDP()`. The same approach works for Puppeteer (`puppeteer.connect({ browserURL })`).
 
@@ -7,14 +7,14 @@ Connect an existing [Playwright](https://playwright.dev/) script to Orbis with `
 In a separate terminal:
 
 ```bash
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 ```
 
 The banner includes:
 
 ```text
-  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  ▶ Discovery Endpoint: http://localhost:9222/json/version
+  â–¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  â–¶ Discovery Endpoint: http://localhost:9222/json/version
 ```
 
 Stealth is on by default. There are no `--cdp` or `--stealth` flags; `--port` sets the CDP port and `--no-stealth` turns stealth off.

@@ -1,4 +1,4 @@
-# Example 05: A Python AI Browsing Agent (and Browser-Use Notes)
+﻿# Example 05: A Python AI Browsing Agent (and Browser-Use Notes)
 
 A complete Python agent that browses with Orbis and reasons with Claude. The model gets three tools (`browse`, `act`, `page_changes`) backed by an Orbis daemon through the [Python SDK](../../docs/python-sdk.md). The example uses a plain tool-use loop you can adapt to any framework.
 
@@ -8,7 +8,7 @@ Requirements: Node.js 20+ (for the daemon) and Python 3.10+ (the current `anthro
 
 ```bash
 # 1. Start Orbis (separate terminal)
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 
 # 2. Install and run
 pip install -r requirements.txt

@@ -1,8 +1,8 @@
-# Orbis Documentation
+﻿# Orbis Documentation
 
 This is the complete documentation for Orbis by Memora: a lightweight headless browser for AI agents and automation. It turns web pages into a compact, numbered action map plus clean Markdown, and it can be driven through a TypeScript SDK, a Python SDK, a REST API, the Chrome DevTools Protocol (Playwright and Puppeteer), W3C WebDriver (Selenium) and the Model Context Protocol (MCP).
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 Every behaviour described in these pages was checked against the Orbis 0.1.1 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
 
@@ -60,13 +60,13 @@ Orbis is published under several names. Use these exact names:
 
 | What | Name | Command |
 | :--- | :--- | :--- |
-| npm package (SDK and CLI) | `@memoracompany/orbis` | `npm install @memoracompany/orbis` |
-| Run the CLI without installing | `@memoracompany/orbis` | `npx -y @memoracompany/orbis --help` |
+| npm package (SDK and CLI) | `@memoracompany/memora-orbis` | `npm install @memoracompany/memora-orbis` |
+| Run the CLI without installing | `@memoracompany/memora-orbis` | `npx -y @memoracompany/memora-orbis --help` |
 | CLI binaries installed by the npm package | `orbis`, `memora-orbis`, `memora-browser` (deprecated) | `orbis --help` |
 | Python SDK on PyPI | `memora-orbis` | `pip install memora-orbis` |
 | Python import | `orbis` | `from orbis import OrbisAgent` |
 
-> **Note:** `memora-orbis` is a CLI *binary name* inside the npm package, not an npm package of its own. `npx memora-orbis` fails with a 404. Always use `npx -y @memoracompany/orbis`.
+> **Note:** `memora-orbis` is a CLI *binary name* inside the npm package, not an npm package of its own. `npx memora-orbis` fails with a 404. Always use `npx -y @memoracompany/memora-orbis`.
 
 ## Interfaces at a glance
 

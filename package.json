@@ -38,7 +38,7 @@
   "author": "Memora <engineering@memora.company> (https://memora.company)",
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
-    "@memoracompany/orbis": "^0.1.1"
+    "@memoracompany/memora-orbis": "^0.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

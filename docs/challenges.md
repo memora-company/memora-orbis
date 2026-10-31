@@ -1,6 +1,6 @@
-# CAPTCHAs, Bot Checks and Rate Limits
+﻿# CAPTCHAs, Bot Checks and Rate Limits
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 Orbis **detects** CAPTCHAs, bot-management interstitials, WAF block pages and rate limits, tells your code or agent about them, and backs off. It can also hand a check to a **person** in a visible Chrome window (MCP only). It does **not** solve challenges, inject solver tokens, transcribe audio challenges, or retry through other proxies or identities, and none of that is planned. See [Responsible use](./stealth.md#responsible-use).
 
@@ -65,7 +65,7 @@ Default behaviour (`onChallenge: 'report'`):
 MCP output for a blocking challenge:
 
 ```
-# CHALLENGE DETECTED — page content not available
+# CHALLENGE DETECTED â€” page content not available
 Vendor: cloudflare | Kind: interstitial | Confidence: high
 Evidence: header cf-mitigated=challenge; title "Just a moment..."
 URL: https://example.com/ [HTTP 403]
@@ -127,7 +127,7 @@ Details and limits:
 ## 6. TypeScript SDK
 
 ```ts
-import { OrbisBrowser, ChallengeDetectedError, ChallengeCooldownError } from '@memoracompany/orbis';
+import { OrbisBrowser, ChallengeDetectedError, ChallengeCooldownError } from '@memoracompany/memora-orbis';
 
 const browser = new OrbisBrowser({ network: { onChallenge: 'stop', challengeCooldownSec: 120 } });
 const page = browser.newPage();
@@ -162,13 +162,13 @@ try {
 | :--- | :--- | :--- |
 | SDK | throws `ChallengeDetectedError` | throws `ChallengeCooldownError` |
 | CDP `Page.navigate` | `errorText: "net::ERR_BLOCKED_BY_RESPONSE"` | `errorText: "net::ERR_BLOCKED_BY_CLIENT"` |
-| WebDriver | `unknown error`: `Navigation failed: …` | `unknown error`: `Navigation failed: …` |
+| WebDriver | `unknown error`: `Navigation failed: â€¦` | `unknown error`: `Navigation failed: â€¦` |
 | MCP | `isError: true`, challenge block plus handoff hint | `isError: true`, cooldown message plus handoff hint |
 | REST (`/orbis/goto`, `/orbis/fill-form`) | `409`, `code: "ERR_CHALLENGE_DETECTED"` | `429` with `Retry-After`, `code: "ERR_CHALLENGE_COOLDOWN"` |
 | Python SDK | raises `ChallengeDetectedError` (subclass of `HTTPError`) | raises `ChallengeCooldownError` (subclass of `HTTPError`) |
 
 In report mode, REST responses carry a `challenge` field and Python snapshots have `snap.challenge` / `snap.blocked`; see [http-api.md](./http-api.md) and [python-sdk.md](./python-sdk.md).
-| `orbis fetch` | `Fetch error: …` on stderr, exit 1 | `Fetch error: …` on stderr, exit 1 |
+| `orbis fetch` | `Fetch error: â€¦` on stderr, exit 1 | `Fetch error: â€¦` on stderr, exit 1 |
 
 ## 8. Accuracy and limits
 

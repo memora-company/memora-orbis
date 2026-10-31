@@ -2,7 +2,7 @@
 
 Every Orbis CDP server (started with `orbis`, `orbis serve`, or `OrbisAgent.launch()`) also exposes a small JSON-over-HTTP API next to the Chrome DevTools Protocol WebSocket. The **agent endpoints** (`/orbis/*`) let any language navigate, read the action map, click, type, fill forms, diff and manage sessions with plain HTTP calls; the Python SDK is a thin client over them. The **discovery endpoints** (`/json/*`) are the standard Chrome endpoints that Playwright, Puppeteer and other CDP clients call. This page documents every endpoint, parameter, response and status code, with responses captured from a running 0.1.0 server.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

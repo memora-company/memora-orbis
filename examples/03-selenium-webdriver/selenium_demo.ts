@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Example 03 (TypeScript): Selenium WebDriver backed by Orbis
  *
  * Start the Orbis WebDriver server first (separate terminal):
- *   npx -y @memoracompany/orbis serve --protocol webdriver --port 9515
+ *   npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
  *
  * Then run: npm install && npm start
  *
@@ -43,7 +43,7 @@ async function main() {
     driver = await new Builder().usingServer(WEBDRIVER_URL).forBrowser('chrome').build();
   } catch (err) {
     console.error(`Could not start a session at ${WEBDRIVER_URL}: ${(err as Error).message}`);
-    console.error('Start Orbis first:\n  npx -y @memoracompany/orbis serve --protocol webdriver --port 9515');
+    console.error('Start Orbis first:\n  npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515');
     site.close();
     process.exit(1);
   }

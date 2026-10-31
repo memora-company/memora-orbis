@@ -1,4 +1,4 @@
-# Example 03: Selenium over W3C WebDriver
+﻿# Example 03: Selenium over W3C WebDriver
 
 Run standard Selenium code against Orbis. Orbis is the WebDriver server, so you do not install `chromedriver` or Chrome.
 
@@ -7,15 +7,15 @@ Run standard Selenium code against Orbis. Orbis is the WebDriver server, so you 
 In a separate terminal:
 
 ```bash
-npx -y @memoracompany/orbis serve --protocol webdriver --port 9515
+npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 ```
 
 The banner includes:
 
 ```text
-  ▶ WebDriver URL:      http://localhost:9515
-  ▶ Status:             http://localhost:9515/status
-  ▶ Max Sessions:       16
+  â–¶ WebDriver URL:      http://localhost:9515
+  â–¶ Status:             http://localhost:9515/status
+  â–¶ Max Sessions:       16
 ```
 
 There is no `--webdriver` flag: use `serve --protocol webdriver`. The legacy Grid prefix `/wd/hub` is also accepted, so `http://localhost:9515/wd/hub` works too.

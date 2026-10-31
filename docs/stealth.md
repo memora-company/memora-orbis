@@ -2,7 +2,7 @@
 
 Orbis ships with a "stealth" profile that makes its HTTP requests and its JavaScript environment look like desktop Chrome 130 on Windows. This page lists what that profile changes and what it doesn't, and it gives guidance on using it responsibly. Read it before you rely on stealth to reach any site. Stealth is a consistency layer, not an anti-bot bypass, and 0.1.0 makes no promise that any particular bot-detection product will let you through.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

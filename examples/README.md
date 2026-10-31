@@ -1,6 +1,6 @@
-# Orbis Examples
+﻿# Orbis Examples
 
-Runnable projects that show how to use Orbis from each interface. Every example was run against the published `@memoracompany/orbis` 0.1.1 package (and `memora-orbis` 0.1.1 on PyPI). Most of them serve their own small local web page, so the output is the same every time and no internet access is needed.
+Runnable projects that show how to use Orbis from each interface. Every example was run against the published `@memoracompany/memora-orbis` 0.1.1 package (and `memora-orbis` 0.1.1 on PyPI). Most of them serve their own small local web page, so the output is the same every time and no internet access is needed.
 
 | Folder | Interface | What it shows | Needs a running daemon? |
 | :--- | :--- | :--- | :--- |
@@ -39,8 +39,8 @@ For the daemon-based examples, start the daemon in a separate terminal first (`n
 | :--- | :--- |
 | 9222 | Orbis CDP daemon (examples 02 and 05) |
 | 9515 | Orbis WebDriver daemon (example 03) |
-| 18091–18095 | Local demo web pages served by the examples |
-| 19222–19224 | CDP servers started by the in-process SDK examples |
+| 18091â€“18095 | Local demo web pages served by the examples |
+| 19222â€“19224 | CDP servers started by the in-process SDK examples |
 
 ## Where to go next
 

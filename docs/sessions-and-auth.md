@@ -2,7 +2,7 @@
 
 This page explains how Orbis stores and restores browser state (cookies, `localStorage`, `sessionStorage`), how to log in once and reuse the session, how to inject tokens, and how to handle expiring sessions safely. It covers the TypeScript SDK, the Python SDK, the REST API, CDP and MCP, and it documents the behaviour of the 0.1.0 native engine that affects authentication.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -63,7 +63,7 @@ Saving creates missing parent directories and overwrites an existing file. Files
 ### TypeScript (`OrbisAgent`)
 
 ```ts
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 const agent = await OrbisAgent.launch({ cdpPort: 9333 });
 // ... log in ...
@@ -76,7 +76,7 @@ agent.page.restoreSession(data);                  // restore from an object (no 
 ### TypeScript (`OrbisBrowser` / `OrbisPage`)
 
 ```ts
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const browser = new OrbisBrowser();
 const page = browser.newPage();
@@ -137,7 +137,7 @@ Log in with credentials from your secret store, verify that it worked, save the 
 
 ```ts
 import fs from 'node:fs';
-import { OrbisBrowser } from '@memoracompany/orbis';
+import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const SESSION = '/data/sessions/app.json';
 const APP = 'https://app.example.com';

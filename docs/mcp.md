@@ -2,7 +2,7 @@
 
 Orbis includes a Model Context Protocol (MCP) server that gives AI assistants (Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code, or any MCP client) a token-efficient web browser. The server speaks JSON-RPC 2.0 over stdio and exposes 15 tools. Each one loads a page, acts on it, or reads from it, and returns compact text: an action map plus Markdown instead of raw HTML. This page covers client setup, engine selection, every tool's inputs and outputs, and the security implications of handing these tools to a model.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -24,15 +24,15 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 The command every client runs:
 
 ```bash
-npx -y @memoracompany/orbis --mcp
+npx -y @memoracompany/memora-orbis --mcp
 ```
 
-- The npm package is **`@memoracompany/orbis`**. `memora-orbis` is the name of a binary inside that package and of the Python package. **There is no npm package called `memora-orbis`**, so `npx -y memora-orbis --mcp` fails with a 404 from the registry.
+- The npm package is **`@memoracompany/memora-orbis`**. `memora-orbis` is the name of a binary inside that package and of the Python package. **There is no npm package called `memora-orbis`**, so `npx -y memora-orbis --mcp` fails with a 404 from the registry.
 - Requires Node.js 20 or later on the machine running the client.
 - For faster start-up and pinned versions, install once and point the client at the binary:
 
 ```bash
-npm install -g @memoracompany/orbis@0.1.0
+npm install -g @memoracompany/memora-orbis@0.1.0
 orbis --mcp        # what the client will run
 ```
 
@@ -40,7 +40,7 @@ orbis --mcp        # what the client will run
 
 ## Client configuration
 
-All examples use `npx`. To use a global install, replace `"command": "npx", "args": ["-y", "@memoracompany/orbis", "--mcp"]` with `"command": "orbis", "args": ["--mcp"]`.
+All examples use `npx`. To use a global install, replace `"command": "npx", "args": ["-y", "@memoracompany/memora-orbis", "--mcp"]` with `"command": "orbis", "args": ["--mcp"]`.
 
 ### Claude Desktop
 
@@ -57,7 +57,7 @@ Config file location:
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": { "ORBIS_NO_TELEMETRY": "1" }
     }
   }
@@ -66,12 +66,12 @@ Config file location:
 
 Restart Claude Desktop fully (quit from the tray or menu bar, not just close the window). The 15 `memora_*` tools appear in the tools menu.
 
-On Windows, if `npx` is not found, use `"command": "cmd", "args": ["/c", "npx", "-y", "@memoracompany/orbis", "--mcp"]`, or the absolute path to `npx.cmd`.
+On Windows, if `npx` is not found, use `"command": "cmd", "args": ["/c", "npx", "-y", "@memoracompany/memora-orbis", "--mcp"]`, or the absolute path to `npx.cmd`.
 
 ### Claude Code
 
 ```bash
-claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/orbis --mcp
+claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/memora-orbis --mcp
 ```
 
 Use `--scope project` to write the server into the repository's `.mcp.json` so your team shares it, or `--scope user` to make it available in all your projects. Check it with:
@@ -89,7 +89,7 @@ Settings â†’ MCP â†’ Add new MCP server, or edit `~/.cursor/mcp.json` 
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": { "ORBIS_NO_TELEMETRY": "1" }
     }
   }
@@ -105,7 +105,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": { "ORBIS_NO_TELEMETRY": "1" }
     }
   }
@@ -126,7 +126,7 @@ Create `.vscode/mcp.json` in the workspace. VS Code uses a `servers` key:
     "orbis": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": { "ORBIS_NO_TELEMETRY": "1" }
     }
   }
@@ -135,7 +135,7 @@ Create `.vscode/mcp.json` in the workspace. VS Code uses a `servers` key:
 
 ### Any other stdio MCP client
 
-Launch `npx -y @memoracompany/orbis --mcp` (or `orbis --mcp`) as a child process. Write one JSON-RPC message per line to its stdin and read one response per line from its stdout. The [protocol details](#protocol-details) below list what the server implements.
+Launch `npx -y @memoracompany/memora-orbis --mcp` (or `orbis --mcp`) as a child process. Write one JSON-RPC message per line to its stdin and read one response per line from its stdout. The [protocol details](#protocol-details) below list what the server implements.
 
 Client config files for Claude Desktop, Cursor and Antigravity are also in [`examples/06-mcp-server`](../examples/06-mcp-server/).
 
@@ -165,7 +165,7 @@ Which engine to use:
 For predictable behaviour, set the engine explicitly:
 
 ```json
-"args": ["-y", "@memoracompany/orbis", "--mcp", "--engine", "native"]
+"args": ["-y", "@memoracompany/memora-orbis", "--mcp", "--engine", "native"]
 ```
 
 Differences that matter:
@@ -186,7 +186,7 @@ All network flags from [cli-reference.md](./cli-reference.md) work in MCP mode. 
 
 ```json
 "args": [
-  "-y", "@memoracompany/orbis", "--mcp", "--engine", "native",
+  "-y", "@memoracompany/memora-orbis", "--mcp", "--engine", "native",
   "--obey-robots",
   "--http-header", "X-Team: research",
   "--user-agent", "AcmeResearchBot/1.0 (+https://acme.example/bot)",
@@ -469,7 +469,7 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"memora_browse","arguments":{"url":"https://example.com"}}}' \
-| ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/orbis --mcp --engine native
+| ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
 Expected: three JSON lines. The second lists 15 tools, and the third contains `# Page Loaded: Example Domain`. The process stays alive until stdin closes or you press Ctrl+C.
@@ -477,7 +477,7 @@ Expected: three JSON lines. The second lists 15 tools, and the third contains `#
 A scripted test client is in [`examples/06-mcp-server/test_mcp_client.ts`](../examples/06-mcp-server/). The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) also works:
 
 ```bash
-npx @modelcontextprotocol/inspector npx -y @memoracompany/orbis --mcp --engine native
+npx @modelcontextprotocol/inspector npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
 ---
@@ -502,7 +502,7 @@ See [security.md](./security.md) for the full hardening guide.
 
 | Symptom | Cause and fix |
 | :--- | :--- |
-| `npm error 404 Not Found - memora-orbis` | Wrong package name. Use `@memoracompany/orbis`. |
+| `npm error 404 Not Found - memora-orbis` | Wrong package name. Use `@memoracompany/memora-orbis`. |
 | Server shows as failed or disconnected immediately | Node.js older than 20, or `npx` not on the client's `PATH` (common for GUI apps on macOS and Windows). Use an absolute path to `npx`/`orbis`, or install globally. |
 | Client reports a JSON parse error at start-up | The version-check banner was printed to stdout. Set `ORBIS_NO_TELEMETRY=1`. |
 | `No Google Chrome or Microsoft Edge executable found` | `--engine chrome` on a machine without Chrome or Edge at the known paths. Install one, or use `--engine native`. |

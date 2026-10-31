@@ -1,24 +1,24 @@
-# Example 06: Orbis as an MCP Server
+﻿# Example 06: Orbis as an MCP Server
 
 Run Orbis as a [Model Context Protocol](https://modelcontextprotocol.io) server so AI assistants such as Claude Desktop, Claude Code, Cursor, Windsurf and Antigravity can browse the web and your local apps. This folder contains ready-to-copy client configurations and a small client that speaks raw JSON-RPC, so you can see exactly what happens on the wire.
 
 ## Client configuration
 
-All clients use the same command: `npx -y @memoracompany/orbis --mcp`. (`npx memora-orbis` does not work: that npm package does not exist.)
+All clients use the same command: `npx -y @memoracompany/memora-orbis --mcp`. (`npx memora-orbis` does not work: that npm package does not exist.)
 
 | Client | Where | File in this folder |
 | :--- | :--- | :--- |
 | Claude Desktop | macOS `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows `%APPDATA%\Claude\claude_desktop_config.json` | [`claude_desktop_config.json`](./claude_desktop_config.json) |
 | Cursor | `~/.cursor/mcp.json` or the project's `.cursor/mcp.json` | [`cursor_mcp.json`](./cursor_mcp.json) |
 | Antigravity / Windsurf / other JSON configs | The client's MCP config file | [`antigravity_mcp.json`](./antigravity_mcp.json) |
-| Claude Code | Command line | `claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/orbis --mcp` |
+| Claude Code | Command line | `claude mcp add orbis -e ORBIS_NO_TELEMETRY=1 -- npx -y @memoracompany/memora-orbis --mcp` |
 
 ```json
 {
   "mcpServers": {
     "orbis": {
       "command": "npx",
-      "args": ["-y", "@memoracompany/orbis", "--mcp"],
+      "args": ["-y", "@memoracompany/memora-orbis", "--mcp"],
       "env": {
         "ORBIS_NO_TELEMETRY": "1"
       }

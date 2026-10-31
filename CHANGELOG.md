@@ -1,6 +1,6 @@
-# Orbis Changelog
+﻿# Orbis Changelog
 
-All notable changes to the Orbis headless browser engine (`@memoracompany/orbis` on npm and `memora-orbis` on PyPI) are documented in this file.
+All notable changes to the Orbis headless browser engine (`@memoracompany/memora-orbis` on npm and `memora-orbis` on PyPI) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added `agent.newContext(options?)`: Spawns a fresh `OrbisContext` for isolated multi-tenant parallel workflows.
 
 ```typescript
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 const agent = await OrbisAgent.launch({ cdpPort: 9222 });
 
@@ -95,13 +95,13 @@ agent.closeTab(adminTab.id);
 
 ### Initial Release
 
-The initial public evaluation release of **Orbis by Memora** — the lightweight headless browser built from the ground up for autonomous AI agents.
+The initial public evaluation release of **Orbis by Memora** â€” the lightweight headless browser built from the ground up for autonomous AI agents.
 
 ### Core Features
 
 - **No-Render Headless Engine:** Downloads HTML, constructs the DOM, and executes JavaScript in an isolated V8 sandbox without layout or painting overhead. Runs in ~107 MB RAM across 10 tabs (vs >1,100 MB for Headless Chrome).
 - **Interactive Action Map:** Automatically annotates interactive controls with numbered action IDs (`@1`, `@2`, `@email`), HTML roles, labels, and CSS selectors.
-- **Markdown Distillation:** Produces clean, token-efficient Markdown representations of web content, saving 33–40% tokens compared to raw HTML.
+- **Markdown Distillation:** Produces clean, token-efficient Markdown representations of web content, saving 33â€“40% tokens compared to raw HTML.
 - **10-Strategy Locator Engine:** Resolves elements by:
   1. Action ID (`@1`, `@2`)
   2. Semantic alias (`@email`, `@submit`)
@@ -116,7 +116,7 @@ The initial public evaluation release of **Orbis by Memora** — the lightweight
 - **State Diffs (`diff()`):** Calculates atomic page state deltas between turns, reporting added, removed, and mutated interactive elements.
 - **Page Branching (`fork()`):** Clones page DOM, storage, and cookies in <5ms for speculative exploration.
 - **Multi-Protocol Connectivity:**
-  - TypeScript SDK (`@memoracompany/orbis`)
+  - TypeScript SDK (`@memoracompany/memora-orbis`)
   - Python SDK (`memora-orbis`)
   - Chrome DevTools Protocol (CDP) server for Playwright and Puppeteer
   - W3C WebDriver server for Selenium

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Example 04: Dependent dropdowns (Country -> State) without broken locators
  *
  * The problem: selecting a country reveals a State dropdown. Action IDs are positional,
@@ -12,7 +12,7 @@
  * The form is loaded with page.setContent(), so the example runs offline.
  * Run: npm install && npm start
  */
-import { OrbisAgent } from '@memoracompany/orbis';
+import { OrbisAgent } from '@memoracompany/memora-orbis';
 
 // Two Orbis 0.1.0 limitations shape this demo page (see docs/limitations.md):
 //  - page scripts have no element.style, so visibility is toggled with the `hidden` attribute;

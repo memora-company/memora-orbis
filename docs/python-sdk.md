@@ -1,8 +1,8 @@
-# Python SDK Reference
+﻿# Python SDK Reference
 
 The Python SDK (`memora-orbis` on PyPI) is a small HTTP client for a running Orbis daemon. It does not contain a browser engine. Every method sends one HTTP request to the daemon's agent REST API (`/orbis/*`, see [http-api.md](./http-api.md)), and the daemon does the work. This page documents every public class and method, what each one sends and returns, and the operational details you need before you use it in production.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -26,11 +26,11 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 ## How the SDK works
 
 ```
-┌──────────────────────┐   HTTP (JSON)    ┌───────────────────────────────┐
-│ your Python process  │ ───────────────▶ │ Orbis daemon (Node.js)         │
-│ orbis.OrbisAgent     │ ◀─────────────── │ `orbis --port 9222`            │
-│ (urllib, no deps)    │                  │ one shared "default page"      │
-└──────────────────────┘                  └───────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   HTTP (JSON)    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ your Python process  â”‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¶ â”‚ Orbis daemon (Node.js)         â”‚
+â”‚ orbis.OrbisAgent     â”‚ â—€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â”‚ `orbis --port 9222`            â”‚
+â”‚ (urllib, no deps)    â”‚                  â”‚ one shared "default page"      â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜                  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 Key facts, all taken from `python/orbis/agent.py` and `src/cdp/server.ts`:
@@ -69,13 +69,13 @@ from orbis import OrbisAgent, OrbisSnapshot
 The SDK needs an Orbis daemon running in CDP mode (the default protocol). Node.js 20 or later is required for the daemon.
 
 ```bash
-npx -y @memoracompany/orbis --port 9222
+npx -y @memoracompany/memora-orbis --port 9222
 ```
 
 Or, after a global install:
 
 ```bash
-npm install -g @memoracompany/orbis
+npm install -g @memoracompany/memora-orbis
 orbis --port 9222
 ```
 
@@ -646,7 +646,7 @@ res = agent.fill_form({"label:Full name": "Priya Sharma"}, submit="text=Continue
 - [ ] Store session files as secrets, and remember the paths are on the daemon host.
 - [ ] Do not take `@N` IDs from focused snapshots into `act()`.
 - [ ] Re-snapshot before acting if page scripts may have changed the DOM. `@N` numbering is recomputed at action time.
-- [ ] Pin both versions: `memora-orbis==0.1.0` in Python and `@memoracompany/orbis@0.1.0` for the daemon.
+- [ ] Pin both versions: `memora-orbis==0.1.0` in Python and `@memoracompany/memora-orbis@0.1.0` for the daemon.
 
 ## Known issues
 

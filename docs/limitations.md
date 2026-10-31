@@ -2,7 +2,7 @@
 
 This page lists what Orbis 0.1.0 does **not** do, and the bugs known in this release. It also gives the recommended workaround for each one. Orbis is not a full browser. It is a lightweight HTML engine with a partial DOM and JavaScript environment, designed to turn pages into compact, actionable text for agents. Check this page before you commit to Orbis for a workflow. Everything here was confirmed in the 0.1.0 source code or at runtime.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

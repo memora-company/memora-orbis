@@ -2,7 +2,7 @@
 
 This page documents every command, flag, environment variable and exit code of the `orbis` command-line tool. The behaviour described here comes from the 0.1.0 source (`src/cli/index.ts`), not from marketing copy. Where a flag is accepted but does nothing useful, or has a known bug, that is called out explicitly.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -24,7 +24,7 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Installing and invoking the CLI
 
-The npm package `@memoracompany/orbis` installs three binary names that all run the same program:
+The npm package `@memoracompany/memora-orbis` installs three binary names that all run the same program:
 
 | Binary | Status |
 | :--- | :--- |
@@ -34,14 +34,14 @@ The npm package `@memoracompany/orbis` installs three binary names that all run 
 
 ```bash
 # One-off, no global install (npx picks the "orbis" binary)
-npx -y @memoracompany/orbis --version
+npx -y @memoracompany/memora-orbis --version
 
 # Global install
-npm install -g @memoracompany/orbis
+npm install -g @memoracompany/memora-orbis
 orbis --version
 
 # Local project install
-npm install @memoracompany/orbis
+npm install @memoracompany/memora-orbis
 npx orbis --version
 ```
 

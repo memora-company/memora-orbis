@@ -2,7 +2,7 @@
 
 Orbis can serve the W3C WebDriver protocol, so Selenium (Python, Java, JavaScript, C#, Ruby), WebdriverIO and other WebDriver clients can drive it through `webdriver.Remote(...)`. You do not need to install a browser or a `chromedriver` binary. Each WebDriver session gets its own isolated Orbis browser running on the native engine. This page covers starting the server, connecting from each language, the complete list of implemented endpoints, what is not supported, and how to run test suites in parallel.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -23,7 +23,7 @@ Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 ## Start the WebDriver server
 
 ```bash
-npx -y @memoracompany/orbis serve --protocol webdriver --port 9515
+npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 ```
 
 - `--protocol webdriver` is required. Without it the server speaks CDP.
@@ -301,7 +301,7 @@ def orbis_server():
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
     port = ORBIS_PORT + (int(worker_id[2:]) if worker_id.startswith("gw") else 0)
     proc = subprocess.Popen(
-        ["npx", "-y", "@memoracompany/orbis", "serve", "--protocol", "webdriver",
+        ["npx", "-y", "@memoracompany/memora-orbis", "serve", "--protocol", "webdriver",
          "--port", str(port), "--max-sessions", "4"],
         env={**os.environ, "ORBIS_NO_TELEMETRY": "1"},
         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
