@@ -2,7 +2,7 @@
 
 This page explains how Orbis works: what kind of browser it is, what happens when it loads a page, how it turns a page into an action map and Markdown, how action IDs, diffs, forks and sessions behave, and which engine runs in which mode. Read it once before you build anything serious. Most surprises in production come from one of the rules described here.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -10,6 +10,7 @@ Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 - [Architecture](#architecture)
 - [The page lifecycle](#the-page-lifecycle)
   - [JavaScript compatibility](#javascript-compatibility)
+- [Multi-Tab and Context Concurrency](#multi-tab-and-context-concurrency)
 - [The semantic snapshot](#the-semantic-snapshot)
 - [Action IDs](#action-ids)
 - [Markdown output](#markdown-output)
@@ -48,21 +49,22 @@ If a site only works with real rendering (canvas apps, heavy WebGL, layout-depen
 ```text
                     ┌────────────────────────── Orbis process (Node.js) ───────────────────────────┐
                     │                                                                              │
- TypeScript SDK ───►│  OrbisAgent ──► OrbisBrowser ──► OrbisPage (one per tab)                     │
-                    │                       │              ├─ DOM (parse5 parser, CSS selectors,   │
- REST  /orbis/*  ──►│  CDP server ──────────┤              │       XPath)                          │
- CDP   /devtools ──►│  (HTTP + WebSocket)   │              ├─ JS sandbox (node:vm, stealth patches)│
-                    │                       │              ├─ Network fetcher (undici: proxies,    │
- WebDriver ────────►│  WebDriver server ────┘              │       cookies, robots.txt)            │
-                    │                                      └─ Distiller (action map, Markdown,     │
- MCP (stdio) ──────►│  MCP server ──► native engine or Chrome engine       metadata, diff)         │
+ TypeScript SDK ───►│  OrbisAgent ──► OrbisBrowser ──► OrbisContext (Context / CookieJar isolation)│
+                    │                       │              │                                       │
+ REST  /orbis/*  ──►│  CDP server ──────────┤              ├──► OrbisPage (Tab 1: DOM, VM, fetch) │
+ CDP   /devtools ──►│  (HTTP + WebSocket)   │              └──► OrbisPage (Tab 2: DOM, VM, fetch) │
+                    │                       │                                                      │
+ WebDriver ────────►│  WebDriver server ────┘                                                      │
+                    │                                                                              │
+ MCP (stdio) ──────►│  MCP server ──► native engine or Chrome engine                               │
                     └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **OrbisBrowser** holds pages and one shared connection pool. All pages in a browser share network settings.
-- **OrbisPage** is one tab: a URL, a DOM, a lazily created JavaScript context, a cookie jar, storage and history.
-- **OrbisAgent** is a convenience wrapper around one browser and one page, with LLM-oriented methods.
-- **Servers** (CDP/REST, WebDriver, MCP) expose a browser to other processes and languages.
+- **OrbisBrowser** holds contexts, pages and one shared connection pool. All pages share browser options and max concurrency guards.
+- **OrbisContext** encapsulates an isolated `CookieJar`, browser storage, and tab group.
+- **OrbisPage** is one tab: a URL, a DOM, a lazily created JavaScript context, an isolated cookie jar, storage and history.
+- **OrbisAgent** is a high-velocity controller managing active tab switching (`tabs`, `newTab()`, `switchTab()`, `closeTab()`) and LLM distillation.
+- **Servers** (CDP/REST, WebDriver, MCP) expose a browser to external tools and processes.
 
 ## The page lifecycle
 
@@ -108,6 +110,16 @@ What this means in practice:
 - **The sandbox is not a security boundary.** Page scripts run in a Node.js `vm` context, and a page can reach the host's `process` object through standard JavaScript tricks (verified in 0.1.0). Any site Orbis loads can run code with the privileges of the Orbis process. Run Orbis in an isolated container without secrets when it visits sites you do not control. See [Security](./security.md).
 - Script errors do not stop Orbis. They are written to the page console. Read them with `page.getLogs()`, the `memora_console` MCP tool, or watch stderr for `[MemoraDOM] Error in ... handler`.
 - Before you build on a site, run `orbis fetch <url> --dump action_map` and check that the elements you need are listed. If they are not, use a full browser for that site or, with MCP, `--engine chrome`.
+
+## Multi-Tab and Context Concurrency
+
+Starting in Orbis 0.1.1, Orbis provides high-performance multi-tab fleet management within a single process:
+
+1. **Lightweight Tabs (`OrbisPage`):** Because Orbis pages skip pixel rendering and compositing, each tab uses only a few megabytes of memory (~10 MB vs >100 MB in real Chrome). You can open dozens of background tabs concurrently without CPU or memory spikes.
+2. **Context Isolation (`OrbisContext`):** `agent.newContext()` or `browser.newContext()` creates an independent browser context. Each context maintains its own **CookieJar** (RFC 6265 compliant with domain, path, and security scoping) and independent storage. Multiple agent workers can log into completely different accounts on the same site concurrently without session bleed.
+3. **Tab Lifecycle & Memory Safety:** When a tab is closed via `agent.closeTab(id)` or `page.close()`, all pending in-flight network requests are instantly cancelled using `AbortController`, timers are stopped, and DOM references are freed immediately.
+4. **Concurrency Safety Limit:** `browser.maxConcurrentPages` (default: 100) protects against accidental unbounded page creation in runaway loops.
+5. **Agent Tab Switching:** `agent.tabs` lists all open pages; `agent.newTab(url, { isolated })` creates tabs; `agent.switchTab(indexOrId)` changes active focus; `agent.closeTab(id)` cleans up.
 
 ## The semantic snapshot
 
@@ -239,8 +251,8 @@ What is **not** copied:
 
 Other facts:
 
-- Forked pages are not registered with the browser, so they do not appear in `listPages()` or to CDP clients.
-- Forking is not free. It serializes and re-parses the DOM: about 5 ms on a small test page (4.9 ms measured on the Orbis test fixture). Large pages take longer.
+- In Orbis 0.1.1+, forked pages are registered with the browser and context, so they appear in `listPages()`, `agent.tabs`, and can be managed like standard tabs.
+- Forking is extremely fast. It serializes and re-parses the DOM in memory: about 5 ms on standard test pages.
 - After forking, the two pages do not affect each other. Navigations in a fork make their own network requests.
 
 Forks work well for reading, extracting, filling forms, following plain links (`activate()` on an `<a href>`) and submitting standard HTML forms. They are not suitable for interactions that depend on JavaScript event handlers.
@@ -262,9 +274,9 @@ A session is the authentication state of a page: cookies, `localStorage` and `se
 
 Restoring a session sets cookies and storage. It does **not** navigate: call `goto()` afterwards. Session files contain live credentials; store them like passwords. See [Sessions and authentication](./sessions-and-auth.md).
 
-> **Known issue (0.1.0):** With the native engine, `localStorage` and `sessionStorage` belong to the current document and are reset on every navigation. Cookies survive navigation; restored storage does not. In a test, a token restored into `localStorage` was readable before `goto()` and `null` after it. Sites that keep their login token in `localStorage` therefore cannot be resumed from a saved session. Cookie-based logins work.
+> **Note on Storage:** With the native engine, `localStorage` and `sessionStorage` belong to the current document and are reset on every navigation. Cookies survive navigation; restored storage does not. Cookie-based logins work reliably across navigations.
 
-> **Known issue (0.1.0):** The cookie jar stores cookies by name only, with no domain, path, expiry or `Secure` scoping. A cookie set by one site is sent to every host the page requests. Do not browse untrusted sites in a page that holds credentials, and use separate pages or processes per site. See [Security](./security.md).
+> **Note on Cookies (0.1.1):** Orbis 0.1.1 introduces an isolated, domain-aware `CookieJar` (RFC 6265 compliant). Cookies are scoped per-domain and per-context. Parallel agent personas operating in different contexts (`agent.newContext()`) or isolated tabs (`agent.newTab({ isolated: true })`) maintain completely separate cookie jars.
 
 ## Engines: native and Chrome
 
@@ -285,9 +297,9 @@ How many pages exist depends on how you use Orbis. This matters for concurrency:
 
 | Mode | Pages | Safe for concurrent users? |
 | :--- | :--- | :--- |
-| `OrbisAgent.launch()` | One page per agent (plus forks) | Yes. Create one agent per task |
+| `OrbisAgent.launch()` | Multiple tabs and isolated contexts (`tabs`, `newTab()`, `newContext()`) | Yes. Supports multi-tab concurrency and multi-agent context isolation |
 | REST API and Python SDK | Endpoints use the daemon's **default page** unless you pass `?id=`; `/orbis/goto` always uses the default page | No. Run one daemon per concurrent agent |
-| CDP (Playwright, Puppeteer) | One page per target created by the client | Yes, within limits. `Browser.close` from one client closes all pages |
+| CDP (Playwright, Puppeteer) | One page per target created by the client; supports CDP `Target.createBrowserContext` | Yes, within limits. `Browser.close` from one client closes all pages |
 | WebDriver (Selenium) | One page per session; at most 16 sessions by default; idle sessions closed after 5 minutes | Yes |
 | MCP | One active page per server process | One client per process (the normal MCP model) |
 

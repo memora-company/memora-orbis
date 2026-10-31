@@ -1,8 +1,8 @@
-# Limitations and Known Issues
+﻿# Limitations and Known Issues
 
 This page lists what Orbis 0.1.0 does **not** do, and the bugs known in this release. It also gives the recommended workaround for each one. Orbis is not a full browser. It is a lightweight HTML engine with a partial DOM and JavaScript environment, designed to turn pages into compact, actionable text for agents. Check this page before you commit to Orbis for a workflow. Everything here was confirmed in the 0.1.0 source code or at runtime.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -95,8 +95,8 @@ These shims are **not** present in SDK, REST or WebDriver-only use until a CDP c
 
   Elements hidden by CSS classes are treated as visible. Use `excludeSelectors` / `focusSelector` to trim them.
 - **Geometry is synthetic.** `getBoundingClientRect` and CDP layout data are approximations produced for protocol compatibility. Do not use them for visual decisions.
-- **Screenshots and PDF.** CDP `Page.captureScreenshot` returns a 1×1 transparent PNG. WebDriver screenshots return a blank PNG. WebDriver print returns `unsupported operation`.
-- **Fixed viewport.** WebDriver window size is fixed at 1280×800, and window size/maximize commands are no-ops. CDP `Emulation.*` commands are accepted and ignored.
+- **Screenshots and PDF.** CDP `Page.captureScreenshot` returns a 1Ã—1 transparent PNG. WebDriver screenshots return a blank PNG. WebDriver print returns `unsupported operation`.
+- **Fixed viewport.** WebDriver window size is fixed at 1280Ã—800, and window size/maximize commands are no-ops. CDP `Emulation.*` commands are accepted and ignored.
 
 ## 4. Browser features not implemented
 
@@ -109,12 +109,12 @@ These shims are **not** present in SDK, REST or WebDriver-only use until a CDP c
 | File download | Responses are read as text. Binary files (PDF, ZIP, images) are not saved. | Download with a normal HTTP client |
 | Non-UTF-8 pages | Response bodies are decoded as UTF-8 | Fetch and decode yourself, then use `page.setContent(html, url)` |
 | Multipart / file form posts | Forms submit as `application/x-www-form-urlencoded` (or GET) | Use the API |
-| Browser history API | `history` is undefined in page scripts. Orbis keeps its own back/forward list (`page.back()`, `page.forward()`). | — |
-| Media, WebRTC, notifications, geolocation, clipboard, service workers | Not available | — |
+| Browser history API | `history` is undefined in page scripts. Orbis keeps its own back/forward list (`page.back()`, `page.forward()`). | â€” |
+| Media, WebRTC, notifications, geolocation, clipboard, service workers | Not available | â€” |
 
 ## 5. Networking and storage
 
-- **Cookies are not scoped.** The jar is a flat `name → value` map per page. Domain, path, `Secure`, `HttpOnly`, `SameSite` and expiry are ignored, and every cookie is sent to every host. See [security.md](./security.md#25-cookies-are-not-scoped-to-a-site).
+- **Cookies are not scoped.** The jar is a flat `name â†’ value` map per page. Domain, path, `Secure`, `HttpOnly`, `SameSite` and expiry are ignored, and every cookie is sent to every host. See [security.md](./security.md#25-cookies-are-not-scoped-to-a-site).
 - **Storage does not survive navigation.** `localStorage` and `sessionStorage` are reset on every navigation in the native engine. See [sessions-and-auth.md](./sessions-and-auth.md#8-native-engine-behaviour-you-must-know).
 - **Only documents, scripts and page `fetch()` are requested.** No CSS, images, fonts or media. There is no `XMLHttpRequest` or `WebSocket`.
 - **No request interception.** CDP domains Orbis does not implement (for example `Fetch`) are accepted and silently ignored. Playwright `page.route()` and Puppeteer request interception therefore have no effect.
@@ -143,7 +143,7 @@ These shims are **not** present in SDK, REST or WebDriver-only use until a CDP c
 - copies the URL, the **serialised DOM**, cookies, and the current document's storage into a new page by re-parsing the HTML. Do not rely on page scripts in the fork;
 - does **not** copy JavaScript heap state or event listeners attached by scripts. **Verified:** a button wired by an external script did nothing in the fork, but worked in the original.
 - creates a page that is **not registered** with the browser, so it does not appear in `listPages()`, CDP target lists or REST endpoints;
-- took about 5–6 ms on a small page in our tests, and grows with page size. It is not a sub-millisecond copy-on-write operation.
+- took about 5â€“6 ms on a small page in our tests, and grows with page size. It is not a sub-millisecond copy-on-write operation.
 
 Use forks for "what if" exploration of static or server-rendered pages. Re-navigate in the fork when you need fully working scripts.
 
@@ -174,9 +174,9 @@ See [production-deployment.md](./production-deployment.md#2-capacity-and-isolati
 
 ## Snapshot size on link-dense pages
 
-Distillation shrinks typical forms and content pages. On the four benchmark fixtures it produced 33–40% fewer tokens than the raw HTML. On **link-dense real pages**, however, a full snapshot can be **larger** than the raw HTML. Every interactive element gets its own action-map line, and elements without an id, test id, name, aria-label, placeholder or unique class get a long positional selector, for example `html:nth-of-type(1) > body:nth-of-type(1) > ... > a:nth-of-type(3)`.
+Distillation shrinks typical forms and content pages. On the four benchmark fixtures it produced 33â€“40% fewer tokens than the raw HTML. On **link-dense real pages**, however, a full snapshot can be **larger** than the raw HTML. Every interactive element gets its own action-map line, and elements without an id, test id, name, aria-label, placeholder or unique class get a long positional selector, for example `html:nth-of-type(1) > body:nth-of-type(1) > ... > a:nth-of-type(3)`.
 
-Measured in October 2026 with `tokenEstimate` (characters ÷ 4):
+Measured in October 2026 with `tokenEstimate` (characters Ã· 4):
 
 | Page | Actions | Snapshot estimate | Raw HTML estimate |
 | :--- | :--- | :--- | :--- |

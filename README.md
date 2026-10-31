@@ -10,6 +10,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@memoracompany/orbis.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@memoracompany/orbis)
 [![PyPI](https://img.shields.io/pypi/v/memora-orbis.svg?style=flat-square&color=brightgreen)](https://pypi.org/project/memora-orbis/)
+[![Changelog](https://img.shields.io/badge/Changelog-v0.1.1-blue.svg?style=flat-square)](./CHANGELOG.md)
 [![License: Evaluation & Commercial](https://img.shields.io/badge/License-Community%20Evaluation-orange.svg?style=flat-square)](./LICENSE.md)
 [![CDP](https://img.shields.io/badge/CDP-Supported-blueviolet.svg?style=flat-square)](./docs/playwright-puppeteer.md)
 [![WebDriver](https://img.shields.io/badge/WebDriver-Supported-orange.svg?style=flat-square)](./docs/selenium-webdriver.md)
@@ -19,6 +20,7 @@
 
 <a href="./docs/README.md"><b>Documentation</b></a> •
 <a href="./docs/getting-started.md"><b>Getting started</b></a> •
+<a href="./CHANGELOG.md"><b>Changelog</b></a> •
 <a href="./docs/use-cases.md"><b>Use cases</b></a> •
 <a href="./docs/production-deployment.md"><b>Production</b></a> •
 <a href="./examples/"><b>Examples</b></a> •
@@ -45,6 +47,8 @@ Your agent reads the map and acts with `@1`, `@2`, `label:Email`, `text=Sign in`
 **Main features**
 
 - **Action map and Markdown.** Every link, button and field gets a numbered action ID; page content becomes Markdown. Options to focus on one region or strip navigation, footers and banners.
+- **Multi-Tab & Worker Concurrency.** Open dozens of parallel background tabs in a single lightweight process without memory leaks. Create isolated browser contexts (`agent.newContext()`) with separate cookie jars for multi-agent workflows.
+- **Challenge & CAPTCHA detection.** Early detection of Cloudflare Turnstile, reCAPTCHA v2/v3, AWS WAF, and 429 rate limits with typed signals and stop policies.
 - **Ten locator strategies.** Action IDs, semantic aliases (`@email`), `text=`, `label:`, `placeholder:`, `testid:`, `role:`, XPath, CSS and bare names. See [Locators](./docs/locators.md).
 - **State diffs.** `diff()` reports added, removed and changed elements plus URL and title changes since the last snapshot.
 - **Forks.** Copy a page (DOM, cookies, storage) into an independent page to try several paths from one starting point.
@@ -126,6 +130,24 @@ const result = await agent.fillForm({
   'placeholder:Password': process.env.APP_PASSWORD ?? '',
 }, 'text=Sign In');
 console.log(result.filled, result.skipped, result.submitted, result.url);
+```
+
+#### Parallel Tabs & Worker Concurrency
+
+Open parallel background tabs or isolated contexts within the same lightweight process:
+
+```typescript
+// Open a secondary background tab without loading a separate browser
+const searchTab = await agent.newTab('https://news.ycombinator.com/newest', { switch: false });
+console.log(`Open tabs: ${agent.tabs.length}`); // 2 tabs, shared memory footprint
+
+// Create an isolated context with its own cookie jar for a separate account
+const isolatedContext = agent.newContext();
+const workerPage = isolatedContext.newPage();
+await workerPage.goto('https://example.com/dashboard');
+
+// Cleanly close tabs when finished (aborts in-flight network requests automatically)
+agent.closeTab(searchTab.id);
 ```
 
 ### Python
@@ -234,13 +256,13 @@ There are no `--cdp`, `--webdriver`, `--stealth` or `--headless` flags. Full lis
 
 ## Before you deploy
 
-Orbis 0.1.0 servers are built for trusted networks. Read [Security](./docs/security.md) and [Production deployment](./docs/production-deployment.md). In short:
+Orbis servers are built for trusted networks. Read [Security](./docs/security.md) and [Production deployment](./docs/production-deployment.md). In short:
 
 - Page JavaScript runs in a Node.js `vm` context, which is not a security boundary: a hostile page can reach the host process. Run Orbis in an isolated container with no secrets when it visits sites you do not control.
 - The servers listen on all interfaces even with `--host localhost`. Firewall the port.
-- The API key is not enforced by the server in 0.1.0. Put an authenticating proxy in front of any reachable port.
-- The REST and Python interfaces share one page per daemon. Run one daemon per concurrent agent.
-- The cookie jar is not scoped by domain. Keep credentials and untrusted sites in separate pages or processes.
+- The API key is stored but should be reinforced by an authenticating proxy in front of any public port.
+- Multi-Tab & Multi-Agent Concurrency (0.1.1): Use `agent.newContext()` or `agent.newTab({ isolated: true })` for isolated cookie jars and distinct storage per agent persona.
+- The cookie jar (0.1.1) provides domain, path, and secure scoping per context.
 - Typed values (including passwords) appear in later action maps and diffs. Do not send them to a model.
 - Production use requires a commercial license. See [License](#license).
 
@@ -251,6 +273,7 @@ Orbis 0.1.0 servers are built for trusted networks. Read [Security](./docs/secur
 | | |
 | :--- | :--- |
 | [Getting started](./docs/getting-started.md) | Install, verify, first scripts in every interface |
+| [Changelog](./CHANGELOG.md) | Version-wise release history and detailed feature changes |
 | [Concepts](./docs/concepts.md) | Page lifecycle, action map, action IDs, diffs, forks, sessions, engines |
 | [Use cases](./docs/use-cases.md) | Complete, real-world recipes |
 | [Best practices](./docs/best-practices.md) | Reliable agent loops, waiting, retries, concurrency |

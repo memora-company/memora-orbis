@@ -2,7 +2,7 @@
 
 Orbis serves a subset of the Chrome DevTools Protocol (CDP). Playwright's `chromium.connectOverCDP()` and Puppeteer's `puppeteer.connect()` can attach to it and drive pages through their normal APIs: navigation, selectors, `fill`, `click`, `evaluate`, extra headers. The engine underneath is not Chrome. It is the native Orbis engine, an HTML parser and DOM with a V8 script sandbox and no rendering. Code that depends on pixels, layout, frames or uploads behaves differently. This page shows how to connect, lists exactly which CDP methods are implemented, and records what was verified to work and fail against the 0.1.0 build.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -218,7 +218,7 @@ From `src/cdp/dispatcher.ts`. Any method in an unlisted domain returns `{}` with
 
 Events emitted: `Target.targetCreated`, `Target.targetDestroyed`, `Target.attachedToTarget`, `Target.detachedFromTarget`, `Page.frameNavigated`, `Page.frameStartedLoading`, `Page.frameStoppedLoading`, `Page.frameRequestedNavigation`, `Page.domContentEventFired`, `Page.loadEventFired`, `Page.lifecycleEvent`, `Runtime.executionContextCreated`, `Runtime.executionContextsCleared`, `Network.requestWillBeSent`, `Network.responseReceived`, `Network.loadingFinished`.
 
-`Browser.getVersion` reports `product: "MemoraEngine/0.1.0"`, while `/json/version` reports `Browser: "Chrome/130.0.0.0"` for client compatibility.
+`Browser.getVersion` reports `product: "MemoraEngine/0.1.1"`, while `/json/version` reports `Browser: "Chrome/130.0.0.0"` for client compatibility.
 
 ## Discovery endpoints
 

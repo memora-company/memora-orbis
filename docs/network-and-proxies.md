@@ -1,8 +1,8 @@
-# Network, Proxies and robots.txt
+﻿# Network, Proxies and robots.txt
 
 This page explains how Orbis makes HTTP requests and how to control them: request headers, the user agent, timeouts, TLS, redirects, proxies (HTTP, HTTPS and SOCKS), `NO_PROXY` rules, robots.txt compliance (RFC 9309) and cookie handling. All options are available as CLI flags and as the `network` option of the TypeScript SDK.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -30,8 +30,8 @@ In the native engine (used by the SDKs, the CDP daemon, the WebDriver daemon, `f
 | Top-level navigation (`goto`, link click via `activate`, form submit) | `NetworkFetcher.request()` | Yes |
 | `<script src>` and module imports | `NetworkFetcher.fetchResource()` | Yes, with resource-style headers (`Accept: */*`, `Referer`) |
 | Page `fetch()` | `NetworkFetcher.pageFetch()` | Yes (proxy, cookies, extra headers, robots). Redirects are followed automatically. |
-| `XMLHttpRequest` | Not available in the native engine (see [limitations.md](./limitations.md)) | — |
-| Images, CSS, fonts, media | **Not requested**. The native engine does not render. | — |
+| `XMLHttpRequest` | Not available in the native engine (see [limitations.md](./limitations.md)) | â€” |
+| Images, CSS, fonts, media | **Not requested**. The native engine does not render. | â€” |
 
 Because stylesheets and images are never downloaded, a page load makes far fewer requests than a real browser. Some bot-detection systems notice this (see [stealth.md](./stealth.md)).
 
@@ -114,7 +114,7 @@ The `Cookie` header is built from the page's cookie jar on every request.
 | Navigation request (all redirect hops) | 20 000 ms | `page.goto(url, { timeoutMs })` or `page.goto(url, 10_000)`; MCP `memora_browse` `timeout` |
 | Script downloads during a load | The remaining navigation budget | Same as navigation |
 | Post-load settle | 5 000 ms (capped by the navigation budget) | `page.settleTimeoutMs`, `page.goto(url, { settleTimeoutMs })` |
-| Page `fetch()` | No Orbis timeout. Pages use their own `AbortController`. | — |
+| Page `fetch()` | No Orbis timeout. Pages use their own `AbortController`. | â€” |
 | robots.txt download | 10 000 ms | Not configurable |
 
 A timed-out navigation throws `Navigation timeout after <ms>ms: <url>`.
@@ -210,7 +210,7 @@ Percent-encode special characters in credentials, for example `p%40ss` for `p@ss
 
 | Message | Meaning |
 | :--- | :--- |
-| `Request to <url> failed: ... (407) — proxy rejected the credentials (check user:pass in --http-proxy or --proxy-bearer-token)` | Wrong or missing proxy credentials. The hint mentions `--http-proxy`, but in 0.1.0 put credentials in the proxy environment variable or `network.proxy`. |
+| `Request to <url> failed: ... (407) â€” proxy rejected the credentials (check user:pass in --http-proxy or --proxy-bearer-token)` | Wrong or missing proxy credentials. The hint mentions `--http-proxy`, but in 0.1.0 put credentials in the proxy environment variable or `network.proxy`. |
 | `Request to <url> failed: connect ECONNREFUSED ...` | The proxy is unreachable |
 | `Navigation timeout after 20000ms: <url>` | The proxy or target is too slow. Raise `timeoutMs` per call. |
 
@@ -282,7 +282,7 @@ Native engine behaviour:
 
 - Each page has its own cookie jar. Pages created by the same `OrbisBrowser` do **not** share cookies. A forked page starts with a copy.
 - `Set-Cookie` is processed on navigations, on every redirect hop, and on the final response of page `fetch()`.
-- The jar is a flat `name → value` map. **Domain, Path, Secure, HttpOnly, SameSite and expiry are ignored.** A cookie is removed only by `Max-Age=0` or an `Expires` date before 1980.
+- The jar is a flat `name â†’ value` map. **Domain, Path, Secure, HttpOnly, SameSite and expiry are ignored.** A cookie is removed only by `Max-Age=0` or an `Expires` date before 1980.
 - Every cookie is sent to every host, including subresources and redirect targets.
 - `document.cookie` is not available to page scripts in the native SDK engine.
 - Manage cookies with `page.fetcher.setCookie(name, value)`, `deleteCookie(name)`, `clearCookies()` and `dumpCookies()`, with WebDriver `add_cookie`/`get_cookies`/`delete_cookie`, CDP `Network.getCookies`, or MCP `memora_cookies`.

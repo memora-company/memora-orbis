@@ -1,8 +1,8 @@
-# Troubleshooting and FAQ
+﻿# Troubleshooting and FAQ
 
 This page lists the problems people commonly run into with Orbis 0.1.0. Each entry gives the symptom, the verified cause, and the fix. Search this page for the exact error message you see. If your problem is not listed, check [limitations.md](./limitations.md) to see whether the feature is supported at all.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -256,7 +256,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"js
 
 `--http-proxy` is a placeholder for an upcoming managed service in 0.1.0. Use `--use-env-proxy` with `HTTPS_PROXY`/`HTTP_PROXY`, or `network.proxy` in TypeScript. See [network-and-proxies.md](./network-and-proxies.md#7-proxies).
 
-### `... (407) — proxy rejected the credentials`
+### `... (407) â€” proxy rejected the credentials`
 
 The proxy credentials are wrong or missing. Put `user:pass@` in the proxy URL (percent-encode special characters), or use `--proxy-bearer-token` (HTTP(S) proxies only).
 
@@ -278,7 +278,7 @@ Do not attempt to bypass access controls you are not authorised to bypass.
 
 ### Screenshots are blank
 
-There is no rendering engine. CDP `Page.captureScreenshot` returns a 1×1 transparent PNG, and WebDriver screenshots return a blank PNG. Use `snapshot.markdown`, `page.content()` or the action map instead. If you need pixels, use the MCP Chrome engine or a real browser.
+There is no rendering engine. CDP `Page.captureScreenshot` returns a 1Ã—1 transparent PNG, and WebDriver screenshots return a blank PNG. Use `snapshot.markdown`, `page.content()` or the action map instead. If you need pixels, use the MCP Chrome engine or a real browser.
 
 ### Content inside an `<iframe>` or a web component's shadow DOM is missing
 
@@ -349,13 +349,13 @@ Not through the REST/Python API, because all requests use one default page. Use 
 No. In 0.1.0 the server does not check it. Use network isolation and a gateway (see [security.md](./security.md)).
 
 **How fast is `fork()`?**
-`fork()` serialises the current DOM, cookies and storage, and re-parses them into a new page. On small pages it took about 5–6 ms in our tests; it grows with page size. JavaScript state and event listeners attached by scripts are **not** copied (see [limitations.md](./limitations.md)).
+`fork()` serialises the current DOM, cookies and storage, and re-parses them into a new page. On small pages it took about 5â€“6 ms in our tests; it grows with page size. JavaScript state and event listeners attached by scripts are **not** copied (see [limitations.md](./limitations.md)).
 
 **Can Orbis download files or render PDFs?**
 No. See [limitations.md](./limitations.md).
 
 **Which numbers can I quote for performance?**
-Only measured ones, with their context. On a Windows 11 laptop (Node 22, October 2026, 200 local test pages, median of three runs), Orbis loaded the pages in 0.31 s against 3.4 s for headless Chrome. With 10 tabs open it used 107 MB against 1,154 MB. On four test fixtures, distillation produced 33–40% fewer tokens than the raw HTML. Your results will differ; measure your own workload.
+Only measured ones, with their context. On a Windows 11 laptop (Node 22, October 2026, 200 local test pages, median of three runs), Orbis loaded the pages in 0.31 s against 3.4 s for headless Chrome. With 10 tabs open it used 107 MB against 1,154 MB. On four test fixtures, distillation produced 33â€“40% fewer tokens than the raw HTML. Your results will differ; measure your own workload.
 
 **Is Orbis free to use in production?**
 No. The Community Evaluation License covers evaluation, development and proof-of-concept work. Production use requires a commercial license. See [LICENSE.md](../LICENSE.md) and [production-deployment.md](./production-deployment.md#licensing).

@@ -2,7 +2,7 @@
 
 This guide explains how to run Orbis reliably in production: which runtime mode to choose, how Orbis uses processes and memory, how to package it for Docker, Kubernetes, systemd and PM2, which timeouts apply, how to observe it, and what to check before going live. Read it together with [security.md](./security.md). The Orbis server has no working authentication in 0.1.0 and listens on every network interface by default, so network isolation is required.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

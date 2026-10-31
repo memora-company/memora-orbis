@@ -1,8 +1,8 @@
-# Framework Integrations
+﻿# Framework Integrations
 
 This page shows how to connect Orbis to agent frameworks and LLM APIs: LangChain (TypeScript and Python), Browser-Use, Stagehand, CrewAI, AutoGen, OpenAI-style function calling, and a complete Claude tool-use loop. For each one it states which Orbis surface it uses (the TypeScript SDK, the Python SDK over HTTP, CDP or MCP) and what was verified for 0.1.0. Integrations that depend on a full Chrome (screenshots, accessibility trees, layout) carry clear warnings.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -389,7 +389,7 @@ OrbisAgent("http://localhost:9222").to_browser_use()
 
 Pass `cdp_url` to whichever Browser-Use class accepts a CDP URL in your Browser-Use version (the constructor names have changed across releases). `extraChromiumArgs` and `disableSecurity` are for launching Chrome and have no effect on Orbis.
 
-> **Warning: Browser-Use on Orbis is not verified for 0.1.0, and is unlikely to work for most tasks.** Browser-Use builds its view of the page from screenshots (vision mode), element bounding boxes, computed styles and visibility, all of which need a rendering engine. On Orbis, screenshots are a blank 1×1 PNG, layout boxes are synthetic, `getComputedStyle` and `IntersectionObserver` are not available in the page runtime, and iframes are not loaded ([playwright-puppeteer.md](./playwright-puppeteer.md#compatibility-matrix)). Vision mode will not work at all.
+> **Warning: Browser-Use on Orbis is not verified for 0.1.0, and is unlikely to work for most tasks.** Browser-Use builds its view of the page from screenshots (vision mode), element bounding boxes, computed styles and visibility, all of which need a rendering engine. On Orbis, screenshots are a blank 1Ã—1 PNG, layout boxes are synthetic, `getComputedStyle` and `IntersectionObserver` are not available in the page runtime, and iframes are not loaded ([playwright-puppeteer.md](./playwright-puppeteer.md#compatibility-matrix)). Vision mode will not work at all.
 >
 > Recommended alternative: keep your Browser-Use-style agent loop but replace the browser layer with Orbis's own tools, either the Python SDK functions above or the MCP server. The action map gives the model the same kind of numbered element list Browser-Use builds from Chrome, without needing rendering.
 

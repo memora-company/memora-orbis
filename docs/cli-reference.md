@@ -1,8 +1,8 @@
-# CLI Reference
+﻿# CLI Reference
 
 This page documents every command, flag, environment variable and exit code of the `orbis` command-line tool. The behaviour described here comes from the 0.1.0 source (`src/cli/index.ts`), not from marketing copy. Where a flag is accepted but does nothing useful, or has a known bug, that is called out explicitly.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -194,7 +194,7 @@ Accepted by the root command and `serve`.
 | `--no-stealth` | flag | stealth on | CDP, WebDriver, `--eval` | Disable the JavaScript fingerprint script. Ignored in `--mcp` mode (the MCP native engine always enables stealth). Does not change HTTP headers. See [stealth.md](./stealth.md). |
 | `--eval <url>` | URL | | root only | One-shot mode (see above). |
 | `--mcp` | flag | | root only | MCP stdio mode (see above). |
-| `--handoff-timeout <sec>` | integer ≥ 10 | `300` | root only, with `--mcp` | Unreleased. Seconds a person gets to complete a check in the `memora_handoff` window. Invalid values exit 1. See [challenges.md](./challenges.md#5-human-handoff-mcp). |
+| `--handoff-timeout <sec>` | integer â‰¥ 10 | `300` | root only, with `--mcp` | Unreleased. Seconds a person gets to complete a check in the `memora_handoff` window. Invalid values exit 1. See [challenges.md](./challenges.md#5-human-handoff-mcp). |
 
 > **Bind address warning.** When `--host` is `localhost` or `127.0.0.1` (including the default), the CDP and WebDriver servers bind to **`0.0.0.0`, i.e. every network interface**, not just loopback. Any machine that can reach the port can drive the browser, read cookies and read/write files through the session endpoints. Any other `--host` value (for example `::1` or a specific interface IP) is bound as given. Read [security.md](./security.md) before running a server on a shared or public network.
 
@@ -217,7 +217,7 @@ Accepted by the root command, `serve` and `fetch`. They configure every HTTP req
 | `--obey-robots` | flag | off | Fetch `/robots.txt` for every origin and refuse disallowed requests (RFC 9309). Applies to navigations, redirect hops, scripts and page `fetch()`. Rules are cached per origin for 24 h. A 4xx robots.txt means "allow all"; a 5xx or network error means "disallow all". Blocked requests fail with `Blocked by robots.txt: <url> (rules from <robots url>)` and a `[Memora] blocked by robots.txt: <url>` line on stderr. See [network-and-proxies.md](./network-and-proxies.md). |
 | `--robots-agent <token>` | `[A-Za-z_-]+` | `MemoraBrowser` | Product token matched against `User-agent:` lines in robots.txt. Letters, `_` and `-` only; anything else exits with `Invalid --robots-agent`. |
 | `--on-challenge <mode>` | `report` \| `stop` | `report` | Unreleased. What navigation does on a blocking CAPTCHA/bot challenge, block page or 429. `report` loads it and flags it; `stop` fails the navigation (`fetch` exits 1). Other values exit 1. See [challenges.md](./challenges.md). |
-| `--challenge-cooldown <sec>` | integer ≥ 0 | `60` | Unreleased. Pause requests to a host for this long after a blocking challenge or 429. The site's `Retry-After` takes precedence; `0` disables. |
+| `--challenge-cooldown <sec>` | integer â‰¥ 0 | `60` | Unreleased. Pause requests to a host for this long after a blocking challenge or 429. The site's `Retry-After` takes precedence; `0` disables. |
 
 > **Known issue (0.1.0):** `--http-timeout` is accepted but has no effect on page navigations with the native engine: navigations always use their own 20,000 ms default. (It is honoured by the Chrome MCP engine.) Do not rely on it to bound request time; wrap calls in your own timeout instead.
 
@@ -267,12 +267,12 @@ The banner is printed to stdout once the port is listening:
 Prints the fetch-and-distill time, title, interactive element count, estimated prompt tokens (characters / 4), the full action map, and the first 1,000 characters of Markdown. Example against a local fixture:
 
 ```text
-🔍 [Orbis] Fetching & Distilling: http://127.0.0.1:18090/ ...
+ðŸ” [Orbis] Fetching & Distilling: http://127.0.0.1:18090/ ...
 
-✨ Successfully distilled in 33.0ms!
-📌 Title: Signup
-🎯 Interactive Elements: 4
-🧠 Estimated Prompt Tokens: 97
+âœ¨ Successfully distilled in 33.0ms!
+ðŸ“Œ Title: Signup
+ðŸŽ¯ Interactive Elements: 4
+ðŸ§  Estimated Prompt Tokens: 97
 
 === INTERACTIVE ACTION MAP (4 elements) ===
 [@1] [input] "Work email" placeholder="Work email" (selector: #email)
@@ -327,13 +327,13 @@ Chrome/Edge discovery for `--engine chrome|auto` checks these paths only: `C:\Pr
 | :--- | :--- | :--- |
 | Server stopped with Ctrl+C / `SIGINT` / `SIGTERM` | 0 | CDP: `[Orbis] Shutting down browser server...`; pages and connections are closed first. |
 | `--eval` finished | 0 | |
-| `--eval` failed (DNS, timeout, robots block...) | **0** | `❌ Error during eval: <reason>` on stderr. Check stderr, not the exit code. |
+| `--eval` failed (DNS, timeout, robots block...) | **0** | `âŒ Error during eval: <reason>` on stderr. Check stderr, not the exit code. |
 | `fetch` succeeded (any HTTP status) | 0 | |
 | `fetch` request failed | 1 | `Fetch error: <reason>` on stderr. |
-| Port already in use | 1 | `❌ Port N is already in use by another process.` plus a hint to use `--port N+1`. |
-| Server failed to start for another reason | 1 | `❌ Could not start ... : <reason>` |
-| Invalid `--http-header`, `--robots-agent` or `--protocol` | 1 | `❌ <message>` |
-| Invalid `--on-challenge`, `--challenge-cooldown` or `--handoff-timeout` (unreleased) | 1 | `❌ <message>` |
+| Port already in use | 1 | `âŒ Port N is already in use by another process.` plus a hint to use `--port N+1`. |
+| Server failed to start for another reason | 1 | `âŒ Could not start ... : <reason>` |
+| Invalid `--http-header`, `--robots-agent` or `--protocol` | 1 | `âŒ <message>` |
+| Invalid `--on-challenge`, `--challenge-cooldown` or `--handoff-timeout` (unreleased) | 1 | `âŒ <message>` |
 | `fetch` hit a challenge with `--on-challenge stop`, or a host in cooldown (unreleased) | 1 | `Fetch error: <challenge block or cooldown message>` on stderr. |
 | Unknown option / missing argument | 1 | Commander's usage error. |
 | `--mcp --engine chrome` without Chrome/Edge installed | non-zero | Crashes at startup with `No Google Chrome or Microsoft Edge executable found on this machine.` Use `--engine native` or `auto`. |

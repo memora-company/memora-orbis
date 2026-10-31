@@ -1,8 +1,8 @@
-# Selenium and W3C WebDriver
+﻿# Selenium and W3C WebDriver
 
 Orbis can serve the W3C WebDriver protocol, so Selenium (Python, Java, JavaScript, C#, Ruby), WebdriverIO and other WebDriver clients can drive it through `webdriver.Remote(...)`. You do not need to install a browser or a `chromedriver` binary. Each WebDriver session gets its own isolated Orbis browser running on the native engine. This page covers starting the server, connecting from each language, the complete list of implemented endpoints, what is not supported, and how to run test suites in parallel.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -237,7 +237,7 @@ All paths below are relative to `/session/{sessionId}` unless marked as global. 
 | GET | `/cookie`, `/cookie/{name}` | Cookies are reported with the current host as `domain`, `path: "/"` and `secure`/`httpOnly` false (the engine stores name and value only). |
 | POST | `/cookie` | Requires an `http(s)` page to be loaded first. |
 | DELETE | `/cookie/{name}`, `/cookie` | |
-| POST / DELETE | `/actions` | Key sources (`keyDown` types into the active element) and pointer sources (`pointerMove` to an element, `pointerDown`/`pointerUp` → click, button 2 → `contextmenu`). `pause` is honoured. Wheel actions are ignored. |
+| POST / DELETE | `/actions` | Key sources (`keyDown` types into the active element) and pointer sources (`pointerMove` to an element, `pointerDown`/`pointerUp` â†’ click, button 2 â†’ `contextmenu`). `pause` is honoured. Wheel actions are ignored. |
 | GET | `/screenshot` | Blank PNG. |
 | POST | `/alert/*`, GET `/alert/text` | Always `no such alert`. |
 | POST | `/print` | `unsupported operation`. |
@@ -252,9 +252,9 @@ Error responses follow the W3C format: `{"value": {"error": "<code>", "message":
 | Alerts, confirms, prompts | `no such alert`. `window.alert` is not even defined in page scripts, so calling it throws a script error. | Test dialog logic on real Chrome. |
 | iframes | `switch_to.frame(...)` raises `no such frame`. Frame content is not loaded. | Navigate to the frame's `src` URL directly. |
 | Shadow DOM | `no such shadow root`. | None. |
-| Screenshots | Blank 1×1 PNG. Calls succeed. | Use real Chrome for visual checks. |
+| Screenshots | Blank 1Ã—1 PNG. Calls succeed. | Use real Chrome for visual checks. |
 | Print to PDF | `unsupported operation`. | |
-| Window size and position | Fixed at 1280×800 and cannot be changed. | |
+| Window size and position | Fixed at 1280Ã—800 and cannot be changed. | |
 | File upload | `send_keys("/path/file.pdf")` on `<input type=file>` stores only the file **name** in the input's value. No file content is sent on submit. | Upload through your application's API in test setup. |
 | CSS computed styles | Only inline `style` values. | Assert on classes or attributes instead. |
 | Visibility from stylesheets | An element hidden by a CSS class (not inline style, not `hidden`) is reported as displayed and is clickable. | Assert visibility through classes or ARIA attributes. |

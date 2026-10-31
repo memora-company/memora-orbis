@@ -1,8 +1,8 @@
 # TypeScript / Node.js SDK Reference
 
-This is the complete reference for the Node.js API exported by `@memoracompany/orbis`: the high-level `OrbisAgent` controller, the lower-level `OrbisBrowser` and `OrbisPage` classes, every exported type, and the building blocks (parser, distiller, locator engine, adapters) you can use on their own. Every signature and default below was checked against the 0.1.0 source, and behaviours marked "verified" were reproduced against the published build.
+This is the complete reference for the Node.js API exported by `@memoracompany/orbis`: the high-level `OrbisAgent` controller, the lower-level `OrbisBrowser`, `OrbisContext`, and `OrbisPage` classes, every exported type, and the building blocks (parser, distiller, locator engine, adapters) you can use on their own.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -73,6 +73,15 @@ class OrbisAgent {
   act(target: string, text?: string): boolean;
   selectOption(target: string, valueOrText: string): boolean;
   fillForm(fields: Record<string, string>, submit?: boolean | string): Promise<FormFillResult>;
+  challenge(): ChallengeSignal | null;
+
+  // Multi-tab and worker concurrency
+  get tabs(): OrbisPage[];
+  newTab(url?: string, options?: { isolated?: boolean; switch?: boolean }): Promise<OrbisPage>;
+  switchTab(tabIdOrIndex: string | number): OrbisPage;
+  closeTab(tabId?: string): boolean;
+  newContext(options?: ContextOptions): OrbisContext;
+
   fork(): OrbisAgent;
   saveSession(filePath: string): void;
   loadSession(filePath: string): void;
@@ -239,6 +248,70 @@ Multi-step wizards are supported at the page level via `steps`; see [`page.fillF
 
 File inputs cannot be filled (no file upload support in 0.1.0).
 
+### Multi-Tab Fleet and Context Concurrency
+
+Starting in Orbis 0.1.1, `OrbisAgent` manages multi-tab workflows, tab switching, and isolated contexts natively.
+
+#### `agent.tabs`
+
+Returns an array of all active `OrbisPage` tabs open across the browser session.
+
+```ts
+console.log(`Open tabs: ${agent.tabs.length}`);
+for (const tab of agent.tabs) {
+  console.log(`Tab ID: ${tab.id}, URL: ${tab.url}`);
+}
+```
+
+#### `agent.newTab(url?, options?)`
+
+Spawns a new tab in the browser session. If a URL is provided, navigates to it immediately.
+
+Options:
+- `switch` (`boolean`, default: `true`): Whether to set this new tab as `agent.page` (the active tab).
+- `isolated` (`boolean`, default: `false`): If `true`, runs the tab in an isolated `OrbisContext` with its own `CookieJar`.
+
+```ts
+// Open a secondary background tab without switching focus
+const backgroundTab = await agent.newTab('https://news.ycombinator.com', { switch: false });
+
+// Open a tab in a completely isolated context (e.g. for a secondary account)
+const privateTab = await agent.newTab('https://dashboard.example.com', { isolated: true });
+```
+
+#### `agent.switchTab(tabIdOrIndex)`
+
+Switches the agent's active working page (`agent.page`) to another tab by index (`0`, `1`, ...) or tab ID.
+
+```ts
+agent.switchTab(0); // Switch to the first tab
+console.log(`Active page is now: ${agent.page.url}`);
+```
+
+#### `agent.closeTab(tabId?)`
+
+Closes a specific tab by ID or the current active tab (`agent.page.id`). Aborts in-flight network requests immediately to free memory. If the active tab is closed, focus falls back to the most recently opened remaining tab.
+
+```ts
+agent.closeTab(backgroundTab.id);
+```
+
+#### `agent.newContext(options?)`
+
+Creates an isolated `OrbisContext` (`BrowserContext`). Contexts hold their own cookie jars, storage, and tabs, enabling multi-agent workflows within a single process.
+
+```ts
+const context = agent.newContext();
+const workerPage = context.newPage();
+await workerPage.goto('https://app.example.com');
+```
+
+#### `agent.challenge()`
+
+Returns a `ChallengeSignal` object if the loaded page is a CAPTCHA, Cloudflare Turnstile, AWS WAF, Akamai, or 429 block page; returns `null` otherwise.
+
+---
+
 ### `agent.fork()`
 
 Clones the current page into a new, independent page and returns a new `OrbisAgent` for it, sharing the same browser and CDP server.
@@ -292,8 +365,13 @@ Closes the page. For agents created by `launch()` (or the constructor) it also s
 ```ts
 class OrbisBrowser {
   readonly options: BrowserOptions;
+  readonly defaultContext: OrbisContext;
+  readonly contexts: Map<string, OrbisContext>;
+  maxConcurrentPages: number; // default: 100
+
   constructor(options?: BrowserOptions);
-  newPage(): OrbisPage;
+  newPage(options?: { isolated?: boolean; context?: OrbisContext }): OrbisPage;
+  newContext(options?: ContextOptions): OrbisContext;
   getPage(id: string): OrbisPage | undefined;
   closePage(id: string): boolean;
   listPages(): OrbisPage[];
@@ -303,8 +381,11 @@ class OrbisBrowser {
 ```
 
 - Defaults: `{ port: 9222, host: 'localhost', stealth: true }`. A top-level `userAgent` is copied into `network.userAgent` (an explicit `network.userAgent` wins).
-- All pages share one connection pool and one robots.txt cache, but each page has **its own cookie jar and storage**. Use separate pages (or browsers) for separate users.
-- `close()` closes every page and the connection pool. It does not stop a `CDPServer`; stop that separately.
+- `maxConcurrentPages`: Safe concurrency ceiling (default: `100` tabs). Prevents unbounded memory growth.
+- **Context Isolation:** `browser.newContext()` creates a dedicated `OrbisContext` with its own RFC 6265 `CookieJar` and storage, mirroring Playwright's `browser.newContext()`.
+- `newPage({ isolated: true })`: Directly creates a page in its own dedicated, isolated context.
+- All pages share one connection pool and one robots.txt cache.
+- `close()` closes every page, all contexts, and the connection pool. It does not stop a `CDPServer`; stop that separately.
 - Creating a browser does not open any port. Wrap it in `new CDPServer(browser)` only if you need CDP.
 
 ```ts

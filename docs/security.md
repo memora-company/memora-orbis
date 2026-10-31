@@ -1,8 +1,8 @@
-# Security Guide
+﻿# Security Guide
 
 This guide describes the security properties of Orbis 0.1.0 as verified against its source code and at runtime, the threats that matter in production, and how to harden a deployment. Orbis loads untrusted web content, executes its JavaScript, and exposes powerful remote-control interfaces (CDP, REST, WebDriver, MCP). Treat every Orbis process as **a component that can be fully controlled by both the websites it visits and anyone who can reach its port**, and isolate it accordingly.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -79,7 +79,7 @@ Mitigations:
 
 ### 2.5 Cookies are not scoped to a site
 
-The native engine stores cookies as a single `name → value` map per page. It ignores `Domain`, `Path`, `Secure`, `HttpOnly`, `SameSite` and expiry dates; only `Max-Age=0` and pre-1980 `Expires` delete a cookie. Every stored cookie is sent to **every** host the page requests, including subresources and page `fetch()` calls. **Verified at runtime:** a cookie set by `http://127.0.0.1:18081/set` was sent to `http://localhost:18081/echo`.
+The native engine stores cookies as a single `name â†’ value` map per page. It ignores `Domain`, `Path`, `Secure`, `HttpOnly`, `SameSite` and expiry dates; only `Max-Age=0` and pre-1980 `Expires` delete a cookie. Every stored cookie is sent to **every** host the page requests, including subresources and page `fetch()` calls. **Verified at runtime:** a cookie set by `http://127.0.0.1:18081/set` was sent to `http://localhost:18081/echo`.
 
 Consequences:
 - After logging in to site A, any later navigation, script or `fetch()` to site B leaks A's session cookie to B.
@@ -213,7 +213,7 @@ Because `/json/version` advertises Orbis's internal address, CDP clients behind 
   - Rotate them. Delete files when the account password changes or the session is revoked.
 - **Do not put secrets in Orbis's environment** unless Orbis needs them. Hostile pages can read `process.env` (section 2.6).
 - **Inject credentials from your secret manager at call time** in your own code, not through prompts or configuration files committed to git.
-- **Custom headers** (`--http-header "Authorization: Bearer …"`) are sent to **every** host the browser contacts, the same as cookies. Only use them when every URL in that process belongs to the same trusted service.
+- **Custom headers** (`--http-header "Authorization: Bearer â€¦"`) are sent to **every** host the browser contacts, the same as cookies. Only use them when every URL in that process belongs to the same trusted service.
 - **Test values only** in shared or staging environments.
 
 ## 7. Keeping secrets away from the LLM

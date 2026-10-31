@@ -2,7 +2,7 @@
 
 The Python SDK for [Orbis by Memora](https://orbis.memora.company), the lightweight headless browser for AI agents. It is a small HTTP client (standard library only) that talks to an Orbis daemon running on Node.js, and returns pages as a numbered action map plus Markdown.
 
-Applies to: `memora-orbis` 0.1.0. Full reference: [docs/python-sdk.md](../docs/python-sdk.md).
+Applies to: `memora-orbis` 0.1.1. Full reference: [docs/python-sdk.md](../docs/python-sdk.md).
 
 ## Install
 

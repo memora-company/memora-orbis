@@ -2,7 +2,7 @@
 
 The Python SDK (`memora-orbis` on PyPI) is a small HTTP client for a running Orbis daemon. It does not contain a browser engine. Every method sends one HTTP request to the daemon's agent REST API (`/orbis/*`, see [http-api.md](./http-api.md)), and the daemon does the work. This page documents every public class and method, what each one sends and returns, and the operational details you need before you use it in production.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -313,9 +313,9 @@ A thin wrapper around the snapshot JSON.
 | `actions` | `list[dict]` | `actions` | One dict per interactive element (see below). |
 | `token_estimate` | `int` | `tokenEstimate` | `ceil(len(title + actionMapText + markdown) / 4)`. A rough character-based estimate, not a tokenizer count. |
 | `interactive_count` | `int` | `interactiveCount` | Number of entries in `actions`. |
-| `challenge` | `dict \| None` | `challenge` | Unreleased. CAPTCHA / bot-check / rate-limit signal of the last navigation (`kind`, `vendor`, `blocking`, `confidence`, `evidence`, `url`, `status`), or `None`. |
-| `challenge_cooldown_sec` | `int` | `challengeCooldownSec` | Unreleased. Seconds the host was paused for; set by `goto()` only. |
-| `blocked` | `bool` | derived | Unreleased. `True` when `challenge["blocking"]`: the snapshot is the challenge page, not the real page. |
+| `challenge` | `dict \| None` | `challenge` | CAPTCHA / bot-check / rate-limit signal of the last navigation (`kind`, `vendor`, `blocking`, `confidence`, `evidence`, `url`, `status`), or `None`. |
+| `challenge_cooldown_sec` | `int` | `challengeCooldownSec` | Seconds the host was paused for; set by `goto()` only. |
+| `blocked` | `bool` | derived | `True` when `challenge["blocking"]`: the snapshot is the challenge page, not the real page. |
 
 `repr(snap)` prints `<OrbisSnapshot 'Title' actions=N tokens=M>`, with ` challenge=<vendor>/<kind>` appended when a challenge was detected.
 
@@ -387,8 +387,8 @@ The SDK does not wrap errors, except for the two challenge errors below, which s
 
 | Exception | When |
 | :--- | :--- |
-| `ChallengeDetectedError` (409, unreleased) | `--on-challenge stop` and the page is a CAPTCHA / bot check / block page / 429. Attributes: `challenge`, `cooldown_sec`, `body`. |
-| `ChallengeCooldownError` (429, unreleased) | The host is paused after a challenge. Attributes: `host`, `remaining_sec`, `challenge`, `body`; `headers["Retry-After"]`. |
+| `ChallengeDetectedError` (409) | `--on-challenge stop` and the page is a CAPTCHA / bot check / block page / 429. Attributes: `challenge`, `cooldown_sec`, `body`. |
+| `ChallengeCooldownError` (429) | The host is paused after a challenge. Attributes: `host`, `remaining_sec`, `challenge`, `body`; `headers["Retry-After"]`. |
 | `urllib.error.URLError` | Daemon not reachable (refused, DNS failure). |
 | `TimeoutError` / `socket.timeout` | Client-side timeout expired (see [Timeouts](#timeouts)). |
 | `urllib.error.HTTPError` (404) | Unknown endpoint, `select_option()`, or the page id was not found. |

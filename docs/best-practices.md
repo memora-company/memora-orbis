@@ -2,7 +2,7 @@
 
 This guide is for engineers putting Orbis into production: in LLM agent loops, deterministic automation and scheduled jobs. It covers how to structure an agent loop, keep token cost and secret exposure under control, choose locators that survive redesigns, handle errors and waiting, manage resources and concurrency, test offline, log usefully, and automate responsibly. Every behaviour described was checked against the 0.1.0 source or observed at runtime. The helper code was type-checked and run.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -257,7 +257,7 @@ try {
 Things to know:
 
 - **CPU work blocks the event loop.** HTML parsing, snapshotting and page scripts run synchronously on the Node.js main thread. A single process mostly gives you concurrency while waiting on the network. For CPU-bound throughput, run several worker processes (or containers) and spread URLs across them.
-- **Pages aren't isolated from each other's hosts.** Each page's cookie jar ignores domain and path (see [sessions-and-auth.md](sessions-and-auth.md)), so don't reuse a logged-in page for unrelated sites.
+- **Context Isolation for Multi-Agent Fleets (0.1.1):** Use `browser.newContext()` or `agent.newContext()` when running parallel workers. Each context creates an isolated `CookieJar` with domain and path scoping, preventing session leaks between concurrent tasks.
 - **Daemons are shared state.** Every CDP, REST or Python client of a daemon sees the same page list, and the Python SDK and REST endpoints act on the daemon's *default page*. Run one daemon per worker. Don't put a single daemon behind a load balancer for unrelated users.
 - **Be a good neighbour.** Concurrency against a single host should stay low (2–4 pages) unless the site owner agrees otherwise.
 

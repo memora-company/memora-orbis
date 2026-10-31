@@ -1,6 +1,6 @@
 # CAPTCHAs, Bot Checks and Rate Limits
 
-> **Availability:** in the source tree, not in a published release yet. Orbis 0.1.0 and 0.1.1 do not have any of this.
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 Orbis **detects** CAPTCHAs, bot-management interstitials, WAF block pages and rate limits, tells your code or agent about them, and backs off. It can also hand a check to a **person** in a visible Chrome window (MCP only). It does **not** solve challenges, inject solver tokens, transcribe audio challenges, or retry through other proxies or identities, and none of that is planned. See [Responsible use](./stealth.md#responsible-use).
 

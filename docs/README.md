@@ -2,9 +2,9 @@
 
 This is the complete documentation for Orbis by Memora: a lightweight headless browser for AI agents and automation. It turns web pages into a compact, numbered action map plus clean Markdown, and it can be driven through a TypeScript SDK, a Python SDK, a REST API, the Chrome DevTools Protocol (Playwright and Puppeteer), W3C WebDriver (Selenium) and the Model Context Protocol (MCP).
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
-Every behaviour described in these pages was checked against the Orbis 0.1.0 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue (0.1.0)**. Read those before you deploy.
+Every behaviour described in these pages was checked against the Orbis 0.1.1 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
 
 ---
 
@@ -13,7 +13,8 @@ Every behaviour described in these pages was checked against the Orbis 0.1.0 sou
 | If you want to... | Read |
 | :--- | :--- |
 | Install Orbis and run your first page in five minutes | [Getting started](./getting-started.md) |
-| Understand how Orbis works and what the action map, diff and fork are | [Concepts](./concepts.md) |
+| Review version history and latest features | [Changelog](../CHANGELOG.md) |
+| Understand how Orbis works and what the action map, diff, multi-tab contexts and fork are | [Concepts](./concepts.md) |
 | See complete, real-world examples you can adapt | [Use cases (cookbook)](./use-cases.md) |
 | Put Orbis into production safely | [Production deployment](./production-deployment.md) and [Security](./security.md) |
 | Know what Orbis cannot do before you commit to it | [Limitations and known issues](./limitations.md) |

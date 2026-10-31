@@ -1,8 +1,8 @@
-# Sessions and Authentication
+﻿# Sessions and Authentication
 
 This page explains how Orbis stores and restores browser state (cookies, `localStorage`, `sessionStorage`), how to log in once and reuse the session, how to inject tokens, and how to handle expiring sessions safely. It covers the TypeScript SDK, the Python SDK, the REST API, CDP and MCP, and it documents the behaviour of the 0.1.0 native engine that affects authentication.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -22,7 +22,7 @@ Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 | Item | Saved | Notes |
 | :--- | :--- | :--- |
-| Cookies | Yes, as `name → value` | No domain, path, expiry or flags (the native cookie jar does not track them) |
+| Cookies | Yes, as `name â†’ value` | No domain, path, expiry or flags (the native cookie jar does not track them) |
 | `localStorage` | Yes | Only the storage of the **currently loaded document** |
 | `sessionStorage` | Yes | Same as `localStorage` |
 | Current URL | Yes (`url`) | Informational only. Loading a session does **not** navigate. |
@@ -244,7 +244,7 @@ Session files are equivalent to logged-in credentials.
 
 ## 8. Native engine behaviour you must know
 
-> **Known issue (0.1.0):** cookies are a flat `name → value` jar with no domain or path scoping, and every cookie is sent to every host the page contacts (verified). Use one page or browser per site and per credential set, and never visit untrusted URLs from an authenticated page. See [security.md](./security.md#25-cookies-are-not-scoped-to-a-site).
+> **Known issue (0.1.0):** cookies are a flat `name â†’ value` jar with no domain or path scoping, and every cookie is sent to every host the page contacts (verified). Use one page or browser per site and per credential set, and never visit untrusted URLs from an authenticated page. See [security.md](./security.md#25-cookies-are-not-scoped-to-a-site).
 
 > **Known issue (0.1.0):** `localStorage` and `sessionStorage` do **not** survive navigation in the native engine. Each navigation (`goto`, `reload`, `back`/`forward`, link clicks and form submissions) creates a fresh JavaScript context with empty storage. Verified:
 > - a value set on page `/a` read as `null` after navigating to `/b`;
@@ -273,7 +273,7 @@ The Chrome engine is used only by the MCP server (`--engine chrome`, or `auto` w
 | Aspect | Chrome engine |
 | :--- | :--- |
 | Cookie scoping | Chrome's normal domain/path/secure scoping |
-| Saving | Cookies are exported as `name → value` only (domain, path and expiry are dropped) |
+| Saving | Cookies are exported as `name â†’ value` only (domain, path and expiry are dropped) |
 | Restoring cookies | Each cookie is added with domain = the host of the current page, or of the session's `url` when the page is `about:blank`, and path `/` |
 | Restoring storage | Written into the current page's origin. Navigate to the application **before** `load`, because writing storage on `about:blank` fails in Chrome. |
 | Storage persistence | Persists per origin across navigations |

@@ -1,8 +1,8 @@
-# Locators
+﻿# Locators
 
 A locator is the string you pass to `act()`, `fillForm()`, `selectOption()`, `activate()`, `waitForSelector()`, the REST `/orbis/act` and `/orbis/fill-form` endpoints, and the Python SDK, to say *which element* you mean. Orbis resolves every locator through one pipeline of ten strategies, from numbered action IDs (`@3`) for LLM agents to CSS, XPath, text, label, placeholder, test-id and ARIA-role locators for deterministic scripts. This page documents the exact matching rules of each strategy as implemented in `src/dom/locators.ts`, the edge cases we verified, and how to choose the right one for production.
 
-Applies to: Orbis 0.1.0 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.1 (`@memoracompany/orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
