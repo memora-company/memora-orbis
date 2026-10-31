@@ -1,0 +1,19 @@
+{
+  "name": "example-01-autonomous-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Orbis agent building blocks: snapshot, compact action map, fillForm, diff, fork and sessions against a local demo app",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@memoracompany/orbis": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

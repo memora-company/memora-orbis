@@ -1,0 +1,5 @@
+# Core SDK has zero mandatory external dependencies (uses standard urllib)
+# Optional integrations:
+# langchain>=0.1.0
+# browser-use>=0.1.20
+

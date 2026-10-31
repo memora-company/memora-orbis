@@ -1,0 +1,51 @@
+{
+  "name": "orbis-community",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orbis by Memora — documentation, guides and runnable examples for the Orbis headless browser for AI agents.",
+  "homepage": "https://orbis.memora.company",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/memora-company/orbis.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "orbis:cdp": "orbis --port 9222",
+    "orbis:webdriver": "orbis serve --protocol webdriver --port 9515",
+    "example:agent": "tsx examples/01-autonomous-agent/index.ts",
+    "example:playwright": "tsx examples/02-playwright-cdp/index.ts",
+    "example:selenium": "tsx examples/03-selenium-webdriver/selenium_demo.ts",
+    "example:dropdown": "tsx examples/04-dynamic-dropdown-wizard/index.ts",
+    "example:mcp": "tsx examples/06-mcp-server/test_mcp_client.ts",
+    "test:examples": "npm run example:agent && npm run example:dropdown && npm run example:mcp"
+  },
+  "keywords": [
+    "orbis",
+    "memora",
+    "ai-agents",
+    "headless-browser",
+    "cdp",
+    "playwright",
+    "selenium",
+    "puppeteer",
+    "mcp",
+    "llm",
+    "web-automation"
+  ],
+  "author": "Memora <engineering@memora.company> (https://memora.company)",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "dependencies": {
+    "@memoracompany/orbis": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/selenium-webdriver": "^4.1.0",
+    "playwright": "^1.48.0",
+    "selenium-webdriver": "^4.19.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

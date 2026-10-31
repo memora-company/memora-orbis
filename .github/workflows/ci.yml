@@ -1,0 +1,60 @@
+name: Examples
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  examples:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    env:
+      ORBIS_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # No lockfile is committed, so use install rather than ci
+      - run: npm install --no-audit --no-fund
+
+      # In-process examples (01, 04) and the MCP stdio client (06)
+      - run: npm run test:examples
+
+      # Daemon-based examples: start Orbis, wait for it, run the clients
+      - name: Playwright over CDP (02)
+        run: |
+          npx orbis --port 9222 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:9222/json/version > /dev/null && break; sleep 1; done
+          npm run example:playwright
+
+      - name: Selenium over WebDriver (03)
+        run: |
+          npx orbis serve --protocol webdriver --port 9515 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:9515/status > /dev/null && break; sleep 1; done
+          npm run example:selenium
+
+  python-examples:
+    runs-on: ubuntu-latest
+    env:
+      ORBIS_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r examples/03-selenium-webdriver/requirements.txt
+      - name: Selenium (Python) over WebDriver (03)
+        run: |
+          npx -y @memoracompany/orbis serve --protocol webdriver --port 9515 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:9515/status > /dev/null && break; sleep 1; done
+          python examples/03-selenium-webdriver/selenium_demo.py

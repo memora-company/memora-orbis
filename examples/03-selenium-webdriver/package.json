@@ -1,0 +1,22 @@
+{
+  "name": "example-03-selenium-webdriver",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Selenium (W3C WebDriver) clients in TypeScript and Python driving Orbis, with no chromedriver",
+  "type": "module",
+  "scripts": {
+    "orbis": "orbis serve --protocol webdriver --port 9515",
+    "start": "tsx selenium_demo.ts",
+    "python": "python selenium_demo.py"
+  },
+  "dependencies": {
+    "@memoracompany/orbis": "^0.1.0",
+    "selenium-webdriver": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/selenium-webdriver": "^4.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

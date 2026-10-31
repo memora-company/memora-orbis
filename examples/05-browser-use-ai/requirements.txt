@@ -1,0 +1,2 @@
+memora-orbis>=0.1.0
+anthropic>=2.3.0

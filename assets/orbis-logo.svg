@@ -1,0 +1,86 @@
+<svg viewBox="48 48 404 404" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <title>Orbis by Memora Logo</title>
+  <desc>The Orbis symbol represents an open gateway to the web. Its connected geometric structure reflects how autonomous agents navigate, understand and interact with the digital world. The open center represents the intelligence that connects everything. Orbis isn't just a browser that shows the web; it's a browser that enables AI agents to act on it.</desc>
+  <defs>
+    <!-- Left Piece Gradients (Memora Lime -> Forest Green -> Vibrant Teal -> Deep Teal) -->
+    <linearGradient id="orbis-l-top" x1="236" y1="58" x2="76" y2="168" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7ADB4B"/>
+      <stop offset="35%" stop-color="#4F851B"/>
+      <stop offset="70%" stop-color="#3D781D"/>
+      <stop offset="100%" stop-color="#029B85"/>
+    </linearGradient>
+
+    <linearGradient id="orbis-l-mid" x1="76" y1="150" x2="158" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#029B85"/>
+      <stop offset="35%" stop-color="#02A68D"/>
+      <stop offset="75%" stop-color="#016A55"/>
+      <stop offset="100%" stop-color="#036E59"/>
+    </linearGradient>
+
+    <linearGradient id="orbis-l-bot" x1="76" y1="350" x2="236" y2="442" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#016A55"/>
+      <stop offset="45%" stop-color="#029B85"/>
+      <stop offset="85%" stop-color="#00CBB4"/>
+      <stop offset="100%" stop-color="#55E6D5"/>
+    </linearGradient>
+
+    <!-- Left Piece Inner 3D Depth / Bevel Facet -->
+    <linearGradient id="orbis-l-depth" x1="158" y1="212" x2="236" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#014A3B"/>
+      <stop offset="100%" stop-color="#002D24"/>
+    </linearGradient>
+
+    <!-- Right Piece Gradients (Memora Forest Green -> Brilliant Gold -> Warm Amber) -->
+    <linearGradient id="orbis-r-top" x1="264" y1="112" x2="424" y2="204" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F851B"/>
+      <stop offset="40%" stop-color="#7D991C"/>
+      <stop offset="80%" stop-color="#C6B202"/>
+      <stop offset="100%" stop-color="#E5C703"/>
+    </linearGradient>
+
+    <linearGradient id="orbis-r-mid" x1="424" y1="204" x2="342" y2="296" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E5C703"/>
+      <stop offset="25%" stop-color="#FECA04"/>
+      <stop offset="65%" stop-color="#FDD405"/>
+      <stop offset="100%" stop-color="#FDBE03"/>
+    </linearGradient>
+
+    <linearGradient id="orbis-r-bot" x1="424" y1="296" x2="264" y2="388" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDD405"/>
+      <stop offset="50%" stop-color="#FDBE03"/>
+      <stop offset="100%" stop-color="#C6B202"/>
+    </linearGradient>
+
+    <!-- Right Piece Inner 3D Depth / Bevel Facet -->
+    <linearGradient id="orbis-r-depth" x1="264" y1="183" x2="342" y2="271" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0A382C"/>
+      <stop offset="100%" stop-color="#031C16"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ==================== LEFT PIECE ==================== -->
+  <!-- Left Inner 3D Depth Bevel (Ambient Occlusion Wall) -->
+  <polygon points="236,166 158,212 158,288 236,334 236,316 172,279 172,221 236,184" fill="url(#orbis-l-depth)" opacity="0.95"/>
+
+  <!-- Left Facet 1: Top Ribbon (Lime -> Emerald Green -> Vibrant Teal) -->
+  <polygon points="236,58 76,150 158,212 236,166" fill="url(#orbis-l-top)"/>
+
+  <!-- Left Facet 2: Mid Vertical Ribbon (Vibrant Teal -> Deep Brand Teal) -->
+  <polygon points="76,150 76,350 158,288 158,212" fill="url(#orbis-l-mid)"/>
+
+  <!-- Left Facet 3: Bottom Ribbon (Deep Teal -> Bright Teal/Cyan) -->
+  <polygon points="158,288 76,350 236,442 236,334" fill="url(#orbis-l-bot)"/>
+
+  <!-- ==================== RIGHT PIECE ==================== -->
+  <!-- Right Inner 3D Depth Bevel (Ambient Occlusion Wall) -->
+  <polygon points="264,183 342,229 342,271 264,317 264,301 328,263 328,237 264,199" fill="url(#orbis-r-depth)" opacity="0.95"/>
+
+  <!-- Right Facet 1: Top Ribbon (Forest Green -> Memora Gold) -->
+  <polygon points="264,112 424,204 342,229 264,183" fill="url(#orbis-r-top)"/>
+
+  <!-- Right Facet 2: Mid Vertical Outer Ribbon (Brilliant Memora Gold) -->
+  <polygon points="424,204 424,296 342,271 342,229" fill="url(#orbis-r-mid)"/>
+
+  <!-- Right Facet 3: Bottom Ribbon (Warm Amber Gold) -->
+  <polygon points="342,271 424,296 264,388 264,317" fill="url(#orbis-r-bot)"/>
+</svg>

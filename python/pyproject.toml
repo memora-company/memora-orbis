@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memora-orbis"
+version = "0.1.0"
+description = "Orbis by Memora — Official Python SDK for AI Browsing Agents (Browser-Use, LangChain, CrewAI, CDP)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Community Evaluation / Commercial - see LICENSE.md" }
+authors = [
+    { name = "Memora", email = "support@memora.company" }
+]
+keywords = ["headless-browser", "orbis", "memora", "cdp", "ai-agents", "browser-use", "langchain", "web-automation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "License :: Other/Proprietary License"
+]
+
+[project.urls]
+Homepage = "https://orbis.memora.company"
+Repository = "https://github.com/memora-company/orbis"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["orbis*"]
