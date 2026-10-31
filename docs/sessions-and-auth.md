@@ -1,8 +1,8 @@
-﻿# Sessions and Authentication
+# Sessions and Authentication
 
 This page explains how Orbis stores and restores browser state (cookies, `localStorage`, `sessionStorage`), how to log in once and reuse the session, how to inject tokens, and how to handle expiring sessions safely. It covers the TypeScript SDK, the Python SDK, the REST API, CDP and MCP, and it documents the behaviour of the 0.1.0 native engine that affects authentication.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

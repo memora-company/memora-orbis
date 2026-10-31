@@ -1,8 +1,8 @@
-﻿# TypeScript / Node.js SDK Reference
+# TypeScript / Node.js SDK Reference
 
 This is the complete reference for the Node.js API exported by `@memoracompany/memora-orbis`: the high-level `OrbisAgent` controller, the lower-level `OrbisBrowser`, `OrbisContext`, and `OrbisPage` classes, every exported type, and the building blocks (parser, distiller, locator engine, adapters) you can use on their own.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -48,7 +48,7 @@ Node.js 20 or 22 is required. No Chrome download is needed: the default engine i
 - **OrbisPage** is one tab: it downloads HTML, parses it into an in-memory DOM, runs the page's scripts in a V8 sandbox, and turns the result into an **action map** (numbered interactive elements `@1`, `@2`, ...) plus **Markdown**. There is no rendering engine, no layout and no screenshots. See [concepts.md](./concepts.md) and [limitations.md](./limitations.md).
 - **OrbisAgent** is a convenience wrapper: one browser, one page, and (with `launch()`) a CDP server so Playwright/Puppeteer can attach to the same process.
 
-Everything except navigation is **synchronous** and runs in your process. A typical agent turn is: `goto()` â†’ read `actionMapText` â†’ `act()` / `fillForm()` â†’ `diff()`.
+Everything except navigation is **synchronous** and runs in your process. A typical agent turn is: `goto()` Ã¢â€ â€™ read `actionMapText` Ã¢â€ â€™ `act()` / `fillForm()` Ã¢â€ â€™ `diff()`.
 
 ---
 
@@ -250,7 +250,7 @@ File inputs cannot be filled (no file upload support in 0.1.0).
 
 ### Multi-Tab Fleet and Context Concurrency
 
-Starting in Orbis 0.1.1, `OrbisAgent` manages multi-tab workflows, tab switching, and isolated contexts natively.
+Starting in Orbis 0.1.2, `OrbisAgent` manages multi-tab workflows, tab switching, and isolated contexts natively.
 
 #### `agent.tabs`
 
@@ -442,7 +442,7 @@ interface NavigateOptions {
 }
 ```
 
-Loading sequence: request with manual redirect following (up to 20 hops, cookies captured on every hop, 303 and POSTâ†’301/302 become GET) â†’ parse HTML â†’ run classic scripts in document order (external ones downloaded in parallel), then `defer`, then `async`; module scripts are bundled â†’ wait until fetch/XHR/short timers are idle (bounded by `settleTimeoutMs` and the timeout) â†’ follow `window.location` assignments made by scripts (up to 5). Pages without scripts never create a JS context.
+Loading sequence: request with manual redirect following (up to 20 hops, cookies captured on every hop, 303 and POSTÃ¢â€ â€™301/302 become GET) Ã¢â€ â€™ parse HTML Ã¢â€ â€™ run classic scripts in document order (external ones downloaded in parallel), then `defer`, then `async`; module scripts are bundled Ã¢â€ â€™ wait until fetch/XHR/short timers are idle (bounded by `settleTimeoutMs` and the timeout) Ã¢â€ â€™ follow `window.location` assignments made by scripts (up to 5). Pages without scripts never create a JS context.
 
 ```ts
 await page.goto('https://api.example.com/search', {
@@ -530,7 +530,7 @@ Note: a step's `submit: 'text=Next'` uses `activate()`, so a "Next" button that 
 
 #### `extract(selector, attribute?, limit = 50)`
 
-CSS selector, first `limit` matches. `attribute`: `'text'`/`'textContent'` â†’ trimmed text; `'html'`/`'innerHTML'` â†’ inner HTML; any other name â†’ that attribute (or `null`); omitted â†’ `{ tag, text, attributes }`.
+CSS selector, first `limit` matches. `attribute`: `'text'`/`'textContent'` Ã¢â€ â€™ trimmed text; `'html'`/`'innerHTML'` Ã¢â€ â€™ inner HTML; any other name Ã¢â€ â€™ that attribute (or `null`); omitted Ã¢â€ â€™ `{ tag, text, attributes }`.
 
 ```ts
 page.extract('a.storylink', 'href', 30);

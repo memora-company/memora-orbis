@@ -1,3 +1,5 @@
+__version__ = "0.1.2"
+
 from memora.agent import (
     OrbisAgent,
     OrbisSnapshot,
@@ -8,6 +10,7 @@ from memora.agent import (
 )
 
 __all__ = [
+    "__version__",
     "OrbisAgent",
     "OrbisSnapshot",
     "MemoraAgent",

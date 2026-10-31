@@ -1,4 +1,4 @@
-﻿# Example 06: Orbis as an MCP Server
+# Example 06: Orbis as an MCP Server
 
 Run Orbis as a [Model Context Protocol](https://modelcontextprotocol.io) server so AI assistants such as Claude Desktop, Claude Code, Cursor, Windsurf and Antigravity can browse the web and your local apps. This folder contains ready-to-copy client configurations and a small client that speaks raw JSON-RPC, so you can see exactly what happens on the wire.
 
@@ -71,7 +71,7 @@ npm start
 The client serves a small search page locally, starts `orbis --mcp --engine native`, and calls `initialize`, `tools/list`, `memora_browse`, `memora_fill_form` and `memora_extract`. Expected output (abridged):
 
 ```text
-Server: Orbis by Memora 0.1.1 (protocol 2024-11-05)
+Server: Orbis by Memora 0.1.2 (protocol 2024-11-05)
 Tools (15): memora_browse, memora_act, memora_diff, memora_fill_form, memora_session, ...
 
 # Page Loaded: Docs search (32.6ms)

@@ -1,8 +1,8 @@
-﻿# Security Guide
+# Security Guide
 
 This guide describes the security properties of Orbis 0.1.0 as verified against its source code and at runtime, the threats that matter in production, and how to harden a deployment. Orbis loads untrusted web content, executes its JavaScript, and exposes powerful remote-control interfaces (CDP, REST, WebDriver, MCP). Treat every Orbis process as **a component that can be fully controlled by both the websites it visits and anyone who can reach its port**, and isolate it accordingly.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

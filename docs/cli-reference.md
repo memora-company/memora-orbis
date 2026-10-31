@@ -1,8 +1,8 @@
-﻿# CLI Reference
+# CLI Reference
 
 This page documents every command, flag, environment variable and exit code of the `orbis` command-line tool. The behaviour described here comes from the 0.1.0 source (`src/cli/index.ts`), not from marketing copy. Where a flag is accepted but does nothing useful, or has a known bug, that is called out explicitly.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

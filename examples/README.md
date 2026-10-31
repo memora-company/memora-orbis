@@ -1,6 +1,6 @@
-﻿# Orbis Examples
+# Orbis Examples
 
-Runnable projects that show how to use Orbis from each interface. Every example was run against the published `@memoracompany/memora-orbis` 0.1.1 package (and `memora-orbis` 0.1.1 on PyPI). Most of them serve their own small local web page, so the output is the same every time and no internet access is needed.
+Runnable projects that show how to use Orbis from each interface. Every example was run against the published `@memoracompany/memora-orbis` 0.1.2 package (and `memora-orbis` 0.1.2 on PyPI). Most of them serve their own small local web page, so the output is the same every time and no internet access is needed.
 
 | Folder | Interface | What it shows | Needs a running daemon? |
 | :--- | :--- | :--- | :--- |

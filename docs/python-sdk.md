@@ -1,8 +1,8 @@
-﻿# Python SDK Reference
+# Python SDK Reference
 
 The Python SDK (`memora-orbis` on PyPI) is a small HTTP client for a running Orbis daemon. It does not contain a browser engine. Every method sends one HTTP request to the daemon's agent REST API (`/orbis/*`, see [http-api.md](./http-api.md)), and the daemon does the work. This page documents every public class and method, what each one sends and returns, and the operational details you need before you use it in production.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

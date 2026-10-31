@@ -1,8 +1,8 @@
-﻿# Network, Proxies and robots.txt
+# Network, Proxies and robots.txt
 
 This page explains how Orbis makes HTTP requests and how to control them: request headers, the user agent, timeouts, TLS, redirects, proxies (HTTP, HTTPS and SOCKS), `NO_PROXY` rules, robots.txt compliance (RFC 9309) and cookie handling. All options are available as CLI flags and as the `network` option of the TypeScript SDK.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

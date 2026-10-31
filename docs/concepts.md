@@ -1,8 +1,8 @@
-﻿# Concepts
+# Concepts
 
 This page explains how Orbis works: what kind of browser it is, what happens when it loads a page, how it turns a page into an action map and Markdown, how action IDs, diffs, forks and sessions behave, and which engine runs in which mode. Read it once before you build anything serious. Most surprises in production come from one of the rules described here.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -47,17 +47,17 @@ If a site only works with real rendering (canvas apps, heavy WebGL, layout-depen
 ## Architecture
 
 ```text
-                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Orbis process (Node.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                    â”‚                                                                              â”‚
- TypeScript SDK â”€â”€â”€â–ºâ”‚  OrbisAgent â”€â”€â–º OrbisBrowser â”€â”€â–º OrbisContext (Context / CookieJar isolation)â”‚
-                    â”‚                       â”‚              â”‚                                       â”‚
- REST  /orbis/*  â”€â”€â–ºâ”‚  CDP server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤              â”œâ”€â”€â–º OrbisPage (Tab 1: DOM, VM, fetch) â”‚
- CDP   /devtools â”€â”€â–ºâ”‚  (HTTP + WebSocket)   â”‚              â””â”€â”€â–º OrbisPage (Tab 2: DOM, VM, fetch) â”‚
-                    â”‚                       â”‚                                                      â”‚
- WebDriver â”€â”€â”€â”€â”€â”€â”€â”€â–ºâ”‚  WebDriver server â”€â”€â”€â”€â”˜                                                      â”‚
-                    â”‚                                                                              â”‚
- MCP (stdio) â”€â”€â”€â”€â”€â”€â–ºâ”‚  MCP server â”€â”€â–º native engine or Chrome engine                               â”‚
-                    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                    Ã¢â€Å’Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Orbis process (Node.js) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Â
+                    Ã¢â€â€š                                                                              Ã¢â€â€š
+ TypeScript SDK Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  OrbisAgent Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisBrowser Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisContext (Context / CookieJar isolation)Ã¢â€â€š
+                    Ã¢â€â€š                       Ã¢â€â€š              Ã¢â€â€š                                       Ã¢â€â€š
+ REST  /orbis/*  Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  CDP server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Â¤              Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisPage (Tab 1: DOM, VM, fetch) Ã¢â€â€š
+ CDP   /devtools Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  (HTTP + WebSocket)   Ã¢â€â€š              Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisPage (Tab 2: DOM, VM, fetch) Ã¢â€â€š
+                    Ã¢â€â€š                       Ã¢â€â€š                                                      Ã¢â€â€š
+ WebDriver Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  WebDriver server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Ëœ                                                      Ã¢â€â€š
+                    Ã¢â€â€š                                                                              Ã¢â€â€š
+ MCP (stdio) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  MCP server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº native engine or Chrome engine                               Ã¢â€â€š
+                    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Ëœ
 ```
 
 - **OrbisBrowser** holds contexts, pages and one shared connection pool. All pages share browser options and max concurrency guards.
@@ -113,7 +113,7 @@ What this means in practice:
 
 ## Multi-Tab and Context Concurrency
 
-Starting in Orbis 0.1.1, Orbis provides high-performance multi-tab fleet management within a single process:
+Starting in Orbis 0.1.2, Orbis provides high-performance multi-tab fleet management within a single process:
 
 1. **Lightweight Tabs (`OrbisPage`):** Because Orbis pages skip pixel rendering and compositing, each tab uses only a few megabytes of memory (~10 MB vs >100 MB in real Chrome). You can open dozens of background tabs concurrently without CPU or memory spikes.
 2. **Context Isolation (`OrbisContext`):** `agent.newContext()` or `browser.newContext()` creates an independent browser context. Each context maintains its own **CookieJar** (RFC 6265 compliant with domain, path, and security scoping) and independent storage. Multiple agent workers can log into completely different accounts on the same site concurrently without session bleed.
@@ -251,7 +251,7 @@ What is **not** copied:
 
 Other facts:
 
-- In Orbis 0.1.1+, forked pages are registered with the browser and context, so they appear in `listPages()`, `agent.tabs`, and can be managed like standard tabs.
+- In Orbis 0.1.2+, forked pages are registered with the browser and context, so they appear in `listPages()`, `agent.tabs`, and can be managed like standard tabs.
 - Forking is extremely fast. It serializes and re-parses the DOM in memory: about 5 ms on standard test pages.
 - After forking, the two pages do not affect each other. Navigations in a fork make their own network requests.
 
@@ -276,7 +276,7 @@ Restoring a session sets cookies and storage. It does **not** navigate: call `go
 
 > **Note on Storage:** With the native engine, `localStorage` and `sessionStorage` belong to the current document and are reset on every navigation. Cookies survive navigation; restored storage does not. Cookie-based logins work reliably across navigations.
 
-> **Note on Cookies (0.1.1):** Orbis 0.1.1 introduces an isolated, domain-aware `CookieJar` (RFC 6265 compliant). Cookies are scoped per-domain and per-context. Parallel agent personas operating in different contexts (`agent.newContext()`) or isolated tabs (`agent.newTab({ isolated: true })`) maintain completely separate cookie jars.
+> **Note on Cookies:** Orbis introduces an isolated, domain-aware `CookieJar` (RFC 6265 compliant). Cookies are scoped per-domain and per-context. Parallel agent personas operating in different contexts (`agent.newContext()`) or isolated tabs (`agent.newTab({ isolated: true })`) maintain completely separate cookie jars.
 
 ## Engines: native and Chrome
 
@@ -313,7 +313,7 @@ These numbers were measured by the Orbis team. They are not guarantees. Measure 
 | :--- | :--- | :--- |
 | Time to load 200 local test pages one after another | 0.31 s (headless Chrome: 3.4 s) | Windows 11 laptop, median of 3 runs, October 2026, timed after the browser started |
 | Memory with 10 tabs open | 107 MB (headless Chrome: 1,154 MB) | Same machine; Orbis = Node.js RSS, Chrome = Playwright headless shell working set |
-| Tokens of distilled output vs raw HTML | 33â€“40% fewer (37% average) | The four HTML fixtures in the Orbis benchmark |
+| Tokens of distilled output vs raw HTML | 33Ã¢â‚¬â€œ40% fewer (37% average) | The four HTML fixtures in the Orbis benchmark |
 | Parse page and build action map plus Markdown | About 4 ms average | Same four fixtures |
 | Fork a page | 4.9 ms | Orbis test fixture |
 

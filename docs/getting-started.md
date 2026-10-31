@@ -1,8 +1,8 @@
-﻿# Getting Started
+# Getting Started
 
 This guide takes you from nothing to a working Orbis setup in about five minutes. You will install Orbis, check the installation, load a page from the command line, drive a page from TypeScript and from Python, and connect an existing Playwright or Selenium script. Each section ends with a link to the full reference.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

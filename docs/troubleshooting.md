@@ -1,8 +1,8 @@
-﻿# Troubleshooting and FAQ
+# Troubleshooting and FAQ
 
 This page lists the problems people commonly run into with Orbis 0.1.0. Each entry gives the symptom, the verified cause, and the fix. Search this page for the exact error message you see. If your problem is not listed, check [limitations.md](./limitations.md) to see whether the feature is supported at all.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

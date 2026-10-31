@@ -1,8 +1,8 @@
-﻿# Framework Integrations
+# Framework Integrations
 
 This page shows how to connect Orbis to agent frameworks and LLM APIs: LangChain (TypeScript and Python), Browser-Use, Stagehand, CrewAI, AutoGen, OpenAI-style function calling, and a complete Claude tool-use loop. For each one it states which Orbis surface it uses (the TypeScript SDK, the Python SDK over HTTP, CDP or MCP) and what was verified for 0.1.0. Integrations that depend on a full Chrome (screenshots, accessibility trees, layout) carry clear warnings.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

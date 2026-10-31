@@ -9,7 +9,7 @@
     "start": "tsx test_mcp_client.ts"
   },
   "dependencies": {
-    "@memoracompany/memora-orbis": "^0.1.1"
+    "@memoracompany/memora-orbis": "^0.1.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

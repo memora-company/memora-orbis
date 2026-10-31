@@ -1,8 +1,8 @@
-﻿# Use-Case Cookbook
+# Use-Case Cookbook
 
 These are production-style recipes for Orbis. Each one covers the problem, when Orbis fits it (and when it doesn't), complete code, the output you should expect, and notes for running it in production. Unless a recipe says otherwise, every TypeScript sample was type-checked against the 0.1.0 type definitions and run end to end against local fixture pages that mimic the target sites. The **Verified** line on each recipe says exactly what was run.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 

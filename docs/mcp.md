@@ -1,8 +1,8 @@
-﻿# MCP Server Guide
+# MCP Server Guide
 
 Orbis includes a Model Context Protocol (MCP) server that gives AI assistants (Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code, or any MCP client) a token-efficient web browser. The server speaks JSON-RPC 2.0 over stdio and exposes 15 tools. Each one loads a page, acts on it, or reads from it, and returns compact text: an action map plus Markdown instead of raw HTML. This page covers client setup, engine selection, every tool's inputs and outputs, and the security implications of handing these tools to a model.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -82,7 +82,7 @@ claude mcp list
 
 ### Cursor
 
-Settings â†’ MCP â†’ Add new MCP server, or edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+Settings Ã¢â€ â€™ MCP Ã¢â€ â€™ Add new MCP server, or edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
 
 ```json
 {
@@ -114,7 +114,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ### Google Antigravity
 
-Open the MCP server settings (Agent panel â†’ MCP Servers â†’ Manage â†’ View raw config) and add the same `mcpServers.orbis` block as above.
+Open the MCP server settings (Agent panel Ã¢â€ â€™ MCP Servers Ã¢â€ â€™ Manage Ã¢â€ â€™ View raw config) and add the same `mcpServers.orbis` block as above.
 
 ### VS Code (GitHub Copilot agent mode)
 
@@ -201,7 +201,7 @@ All network flags from [cli-reference.md](./cli-reference.md) work in MCP mode. 
 
 ## Tool reference
 
-The server holds **one active page** for the lifetime of the process. Every tool operates on it. Tool names are `memora_*`. Calls to `orbis_*` names are accepted as aliases (for example `orbis_browse` â†’ `memora_browse`), but `tools/list` advertises only the `memora_*` names. All results are returned as a single `text` content item. Failures return `isError: true` with the text `Error executing <tool>: <message>`.
+The server holds **one active page** for the lifetime of the process. Every tool operates on it. Tool names are `memora_*`. Calls to `orbis_*` names are accepted as aliases (for example `orbis_browse` Ã¢â€ â€™ `memora_browse`), but `tools/list` advertises only the `memora_*` names. All results are returned as a single `text` content item. Failures return `isError: true` with the text `Error executing <tool>: <message>`.
 
 ### Summary
 
@@ -286,7 +286,7 @@ Fills several fields in one call.
 
 | Input | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `fields` | object (string â†’ string) | yes | Locator â†’ value. Checkboxes and radios accept `true`/`1`/`yes`/`checked`/`on`. |
+| `fields` | object (string Ã¢â€ â€™ string) | yes | Locator Ã¢â€ â€™ value. Checkboxes and radios accept `true`/`1`/`yes`/`checked`/`on`. |
 | `submitActionId` | string | no | Locator of the button (or `form`) to activate after filling. **If omitted, the form is not submitted.** |
 
 Returns `Form fill completed! Filled <n> field(s)[, submitted form].`, then the URL, title and new action map.
@@ -428,7 +428,7 @@ Use it to try a risky path when you can afford to lose the original. To return t
 
 ### `memora_handoff`
 
-> **Availability:** unreleased; not in 0.1.0 or 0.1.1.
+> **Availability:** unreleased; not in 0.1.0, 0.1.1 or 0.1.2.
 
 | Input | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
@@ -437,7 +437,7 @@ Use it to try a risky path when you can afford to lose the original. To return t
 
 Opens the page in a **visible** Chrome/Edge window so the user can complete a CAPTCHA or bot check themselves. The agent should tell the user to do so, then poll `status`. Orbis does not interact with the window. When the state becomes `resolved`, the server's active engine **switches to that window** (the previous engine is closed) and the result includes the new page's action map. Later tool calls run in the visible window.
 
-Outputs: `Handoff started: â€¦`, `Handoff state: waiting | expired | cancelled | unavailable | idle` (with `Reason:` where relevant), or `Handoff resolved: â€¦`.
+Outputs: `Handoff started: Ã¢â‚¬Â¦`, `Handoff state: waiting | expired | cancelled | unavailable | idle` (with `Reason:` where relevant), or `Handoff resolved: Ã¢â‚¬Â¦`.
 
 - Timeout: `--handoff-timeout <sec>` (default 300).
 - `unavailable` without a display (Linux servers, containers) or without Chrome/Edge.
@@ -524,7 +524,7 @@ More in [troubleshooting.md](./troubleshooting.md).
 
 > **Known issue (0.1.0):** `memora_eval` on the native engine does not await promises and wraps results in `{ "type", "value" }`, unlike the Chrome engine.
 
-> **Known issue (0.1.0):** The `memora_browse` description advertises "95% token savings". The measured reduction on the project's own benchmark pages is about 37% on average (33â€“40% across four fixture pages, Windows 11 laptop, Node 22, 30 Oct 2026). Savings on real pages depend heavily on the page.
+> **Known issue (0.1.0):** The `memora_browse` description advertises "95% token savings". The measured reduction on the project's own benchmark pages is about 37% on average (33Ã¢â‚¬â€œ40% across four fixture pages, Windows 11 laptop, Node 22, 30 Oct 2026). Savings on real pages depend heavily on the page.
 
 > **Known issue (0.1.0):** `--engine auto` silently switches to Chrome when Chrome or Edge is installed, so behaviour differs between machines. Pin `--engine native` or `--engine chrome` in shared configurations.
 

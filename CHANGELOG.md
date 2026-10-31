@@ -1,8 +1,17 @@
-﻿# Orbis Changelog
+# Orbis Changelog
 
 All notable changes to the Orbis headless browser engine (`@memoracompany/memora-orbis` on npm and `memora-orbis` on PyPI) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.2] - 2026-10-31
+
+### Changed
+- **Package Rebranding & Alignment:** Formally rebranded npm package to `@memoracompany/memora-orbis` to ensure 100% naming parity across npm (`@memoracompany/memora-orbis`) and PyPI (`memora-orbis`).
+- **Repository URLs:** Updated all metadata and documentation references to `https://github.com/memora-company/memora-orbis`.
+- **Distribution Packages:** Generated hardened `memoracompany-memora-orbis-0.1.2.tgz` and PyPI wheels.
 
 ---
 

@@ -1,10 +1,10 @@
-﻿# Orbis Documentation
+# Orbis Documentation
 
 This is the complete documentation for Orbis by Memora: a lightweight headless browser for AI agents and automation. It turns web pages into a compact, numbered action map plus clean Markdown, and it can be driven through a TypeScript SDK, a Python SDK, a REST API, the Chrome DevTools Protocol (Playwright and Puppeteer), W3C WebDriver (Selenium) and the Model Context Protocol (MCP).
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
-Every behaviour described in these pages was checked against the Orbis 0.1.1 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
+Every behaviour described in these pages was checked against the Orbis 0.1.2 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
 
 ---
 

@@ -1,8 +1,8 @@
-﻿# Selenium and W3C WebDriver
+# Selenium and W3C WebDriver
 
 Orbis can serve the W3C WebDriver protocol, so Selenium (Python, Java, JavaScript, C#, Ruby), WebdriverIO and other WebDriver clients can drive it through `webdriver.Remote(...)`. You do not need to install a browser or a `chromedriver` binary. Each WebDriver session gets its own isolated Orbis browser running on the native engine. This page covers starting the server, connecting from each language, the complete list of implemented endpoints, what is not supported, and how to run test suites in parallel.
 
-Applies to: Orbis 0.1.1 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
