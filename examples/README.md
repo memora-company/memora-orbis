@@ -39,8 +39,8 @@ For the daemon-based examples, start the daemon in a separate terminal first (`n
 | :--- | :--- |
 | 9222 | Orbis CDP daemon (examples 02 and 05) |
 | 9515 | Orbis WebDriver daemon (example 03) |
-| 18091â€“18095 | Local demo web pages served by the examples |
-| 19222â€“19224 | CDP servers started by the in-process SDK examples |
+| 18091–18095 | Local demo web pages served by the examples |
+| 19222–19224 | CDP servers started by the in-process SDK examples |
 
 ## Where to go next
 

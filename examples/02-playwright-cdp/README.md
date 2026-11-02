@@ -13,8 +13,8 @@ npx -y @memoracompany/memora-orbis --port 9222
 The banner includes:
 
 ```text
-  â–¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  â–¶ Discovery Endpoint: http://localhost:9222/json/version
+  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  ▶ Discovery Endpoint: http://localhost:9222/json/version
 ```
 
 Stealth is on by default. There are no `--cdp` or `--stealth` flags; `--port` sets the CDP port and `--no-stealth` turns stealth off.

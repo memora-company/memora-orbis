@@ -1,8 +1,8 @@
 # Troubleshooting and FAQ
 
-This page lists the problems people commonly run into with Orbis 0.1.0. Each entry gives the symptom, the verified cause, and the fix. Search this page for the exact error message you see. If your problem is not listed, check [limitations.md](./limitations.md) to see whether the feature is supported at all.
+This page lists the problems people commonly run into with Orbis. Each entry gives the symptom, the verified cause, and the fix. Search this page for the exact error message you see. If your problem is not listed, check [limitations.md](./limitations.md) to see whether the feature is supported at all.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -51,15 +51,17 @@ lsof -i :9222
 Get-NetTCPConnection -LocalPort 9222 | Select-Object OwningProcess
 ```
 
-### The daemon crashes on the first request after starting with `--host ::1`
+### Other machines or containers cannot connect to the daemon
 
-**Cause:** IPv6 literal hosts produce invalid internal URLs in 0.1.0.
+**Cause:** `--host localhost` (the default) and `--host 127.0.0.1` listen on `127.0.0.1` only. (Before 0.2.0 they listened on all interfaces.)
 
-**Fix:** use an IPv4 address. For loopback-only access use `--host 127.0.0.2` (see [security.md](./security.md#21-the-server-listens-on-all-interfaces-by-default)).
+**Fix:** start the daemon with `--host 0.0.0.0` (or a specific private IP), set `ORBIS_API_KEY`, and firewall the port. See [security.md](./security.md#21-bind-address) and [security.md](./security.md#3-network-isolation).
 
-### The server is reachable from other machines even though I used `--host localhost`
+### Requests fail with HTTP 401 or 403
 
-**Cause:** in 0.1.0, `localhost` and `127.0.0.1` are rewritten to `0.0.0.0`. **Fix:** see [security.md](./security.md#3-network-isolation).
+- **401** (`ERR_UNAUTHORIZED`): the daemon runs with `ORBIS_API_KEY` and the request did not send it. Send `x-api-key: <key>`, `Authorization: Bearer <key>` or `?apiKey=<key>`. The SDKs send it when you pass `apiKey` / `api_key` or set the environment variable. Health checks need it too.
+- **403** `ERR_FORBIDDEN_ORIGIN`: the request came from a web page in a browser. The daemon refuses those; call it from your own code instead.
+- **403** `ERR_SESSION_PATH`: a session file path is outside the daemon's session folder or does not end in `.json`. See [sessions-and-auth.md](./sessions-and-auth.md#3-saving-and-loading-in-every-interface).
 
 ### `Unknown --protocol "..."`
 
@@ -75,7 +77,7 @@ The robots token cannot contain digits, spaces, `/` or dots. Use something like 
 
 Work through these causes in order:
 
-1. **The content is rendered by client-side JavaScript that Orbis cannot run.** Orbis executes page scripts in a lightweight DOM, not a full browser. Many modern bundles (React, Vue and Angular apps, analytics, anything using `XMLHttpRequest`, `history.pushState`, `new Event()`, `requestAnimationFrame` or `element.style`) throw and never render. See the [compatibility table](./limitations.md#2-javascript-and-dom-compatibility).
+1. **The content is rendered by client-side JavaScript that Orbis cannot run.** Orbis executes page scripts in a lightweight DOM, not a full browser. Many modern bundles (React, Vue and Angular apps, analytics, anything using `WebSocket`, `Worker`, `indexedDB`, `customElements` or real `MutationObserver` callbacks) throw or never render. DOM coverage is not complete, even though `XMLHttpRequest`, `history`, event constructors, `getComputedStyle`, `requestAnimationFrame` and `element.style` are available. See the [compatibility table](./limitations.md#2-javascript-and-dom-compatibility).
    - Check the page console: `page.getLogs()` (SDK) or `memora_console` (MCP). Look for `TypeError`, `ReferenceError` and `[MemoraDOM] Error in ... handler`.
    - **Fix:** prefer server-rendered pages. Use the site's JSON API, or a server-rendered variant of the page if the site offers one. For JavaScript-heavy pages in MCP, use the Chrome engine (`--engine chrome`).
 2. **The data arrives after load.** `goto()` waits up to 5 seconds (the *settle* phase) for `fetch()` calls, their promise chains, and timers of 1 second or less. It ignores `setInterval` and longer timers.
@@ -92,7 +94,7 @@ Work through these causes in order:
 4. **The script failed to download.** The console shows `Failed to load script <url>: HTTP 403` or similar. Check headers, proxies and robots.txt.
 5. **The elements are hidden.** By default, snapshots skip elements with the `hidden` attribute, `aria-hidden="true"`, `type="hidden"`, or an inline `style` containing `display:none` or `visibility:hidden` (themselves or on an ancestor). Pass `{ filterHidden: false }` to include them.
 6. **`focusSelector` / `excludeSelectors`** removed the content. An invalid or non-matching `focusSelector` falls back to the whole document; `excludeSelectors` silently ignores invalid selectors.
-7. **The site served different content to Orbis.** Some sites return a reduced page or a challenge page to automated clients. Compare `page.content()` with what you expect. In unreleased builds, `page.challenge()` tells you whether it was a recognised CAPTCHA, bot check or block page (see [challenges.md](challenges.md)).
+7. **The site served different content to Orbis.** Some sites return a reduced page or a challenge page to automated clients. Compare `page.content()` with what you expect. From 0.1.2, `page.challenge()` tells you whether it was a recognised CAPTCHA, bot check or block page (see [challenges.md](challenges.md)).
 
 ### The snapshot shows menus, modals or cookie banners that are not visible in Chrome
 
@@ -113,16 +115,16 @@ await page.activate('text=Delete');
 
 Over CDP, register the stub with `Page.addScriptToEvaluateOnNewDocument` (Playwright: `page.addInitScript`).
 
-### `TypeError: Cannot set properties of undefined (setting 'display')`
+### `TypeError` or `ReferenceError` in a page event handler
 
-**Cause:** elements have no `style` object in 0.1.0, so page code such as `el.style.display = 'block'` throws. The error is logged as `[MemoraDOM] Error in <event> handler`. The rest of that handler does not run. For example, a dependent dropdown might not be populated. **Fix:** see the workarounds in [limitations.md](./limitations.md#2-javascript-and-dom-compatibility). Often the reliable route is to set the final field values directly with `fillForm`, or to call the site's API.
+**Cause:** the page uses a browser API the native engine does not provide, such as `WebSocket`, `crypto`, `insertAdjacentHTML` or `document.cookie` (see [limitations.md](./limitations.md#2-javascript-and-dom-compatibility)). The error is logged as `[MemoraDOM] Error in <event> handler`, and the rest of that handler does not run. For example, a dependent dropdown might not be populated. **Fix:** often the reliable route is to set the final field values directly with `fillForm`, or to call the site's API. For JavaScript-heavy pages in MCP, use the Chrome engine.
 
 ### Prompts are huge, or the model context overflows
 
 **Cause:** full snapshots of link-dense pages carry one line per interactive element, often with a long positional selector. In October 2026 a Hacker News front page produced 228 actions and about 17,800 estimated tokens, against about 8,700 for its raw HTML. A Wikipedia article produced 1,230 actions and about 120,000 tokens. MCP `memora_browse` also returns up to 4,000 characters of Markdown on top of the action map.
 
 **Fix:**
-- Snapshot only the region you need: `agent.snapshot({ focusSelector: 'main', excludeSelectors: ['nav', 'footer', 'aside'] })`, or MCP `focus`/`exclude`. Remember that action IDs from focused snapshots must not be used for acting (see [`@3` clicked the wrong element](#3-clicked-the-wrong-element)).
+- Snapshot only the region you need: `agent.snapshot({ focusSelector: 'main', excludeSelectors: ['nav', 'footer', 'aside'] })`, or MCP `focus`/`exclude`. Action IDs from a focused snapshot refer to the elements shown in it, so the model can act on them.
 - Send a compact list built from `snapshot.actions` (for example `@id role "text"`, without selectors), and keep the selectors in your code.
 - After the first turn, send only `diff().summary`.
 - Cap the Markdown length, and check `snapshot.tokenEstimate` before every model call.
@@ -131,89 +133,72 @@ See [best-practices.md](./best-practices.md) and [limitations.md](./limitations.
 
 ### `Navigation timeout after 20000ms: <url>`
 
-The default navigation timeout is 20 seconds. Raise it per call with `page.goto(url, { timeoutMs: 60_000 })`, or via the `timeout` argument of the MCP `memora_browse` tool. `--http-timeout` does **not** change it in 0.1.0 (see [network-and-proxies.md](./network-and-proxies.md#4-timeouts)).
+The default navigation timeout is 20 seconds. Change the default with `--http-timeout <ms>` (CLI) or `network.timeoutMs` (SDK), raise it per call with `page.goto(url, { timeoutMs: 60_000 })`, or use the `timeout` argument of the MCP `memora_browse` tool (see [network-and-proxies.md](./network-and-proxies.md#4-timeouts)).
 
 ## Interacting with elements
 
 ### Clicking a link or submit button does nothing (URL unchanged)
 
-**Cause:** `agent.act(target)`, `page.click(target)`, REST `POST /orbis/act` and the Python SDK's `act()` only **dispatch a click event**. They do not perform browser default actions, so they don't follow links, submit forms or toggle checkboxes. **Verified:** `act('text=Go next')` returned `true`, but the URL did not change.
+Clicks through `agent.act(target)`, `page.click(target)`, REST `POST /orbis/act`, the Python SDK's `act()`, MCP `memora_act`, Playwright and Selenium all follow links and submit forms like a real click. If the URL did not change:
 
-**Fix:**
+- **TypeScript: you did not `await` the call.** `agent.act()` and `page.click()` are async and return a `Promise<boolean>`. Reading the page before the promise resolves shows the old page. Use `await agent.act('@4')`.
+- **The click returned `false`.** The locator matched nothing. Check it against a fresh snapshot.
+- **A page script cancelled the action** (`event.preventDefault()`), or the button only runs JavaScript. Check `page.getLogs()` for script errors.
 
-| Interface | How to get full click behaviour |
-| :--- | :--- |
-| TypeScript | `await agent.page.activate(target)`. It follows links, submits forms, toggles checkboxes/radios and selects options, and returns `true` if it navigated. |
-| Forms (any SDK) | `fillForm(fields, 'text=Submit')`. The submit target is activated with default actions. |
-| Python / REST | For links, read the `href` from `snapshot.actions` and call `goto(href)`. For forms, use `fill_form(fields, submit=True)`. |
-| MCP | `memora_act` with `type: "click"` already uses full activation |
-| Playwright / Selenium | `page.click()` / `element.click()` perform default actions |
+> **Changed in 0.2.0:** earlier versions of `act()`, `page.click()`, REST `/orbis/act` and Python `act()` only dispatched a click event and did not follow links or submit forms.
 
 ### `@3` clicked the wrong element
 
 The action ID was resolved against a different element list than the one the model saw:
 
-- **IDs from a focused snapshot.** Snapshots taken with `focusSelector` (MCP `focus`) number elements from `@1` inside the focused region. Action resolution always renumbers the **whole document**. **Verified:** `@1` was an input in `snapshot({ focusSelector: 'main' })`, but a navigation link in the full snapshot.
-- **The page changed** between the snapshot and the action (async rendering, a previous action), so the numbering shifted.
+- **Another snapshot was taken in between.** IDs refer to the latest snapshot of the page. If your code took a second snapshot (for example with different `focusSelector` options) after the model saw the first, the IDs now refer to the second one.
+- **The page changed or navigated** between the snapshot and the action (async rendering, a previous action).
 - **The element is hidden,** and therefore not numbered.
 
 **Fix:**
-- Use action IDs only from an **unfocused** snapshot taken immediately before acting.
+- Give the model the most recent snapshot, and act on its IDs before taking another one.
 - Re-snapshot after every action.
 - For deterministic code, use the stable `selector` field from `snapshot.actions[i].selector`, or a semantic locator such as `label:Email` or `text=Save` (see [locators.md](./locators.md)).
 
 ### Inputs appear as `"[Untitled input]"` in the action map
 
-**Cause:** an element's text is taken from `aria-label`, `placeholder`, `title`, `value`, or its text content. The text of an associated `<label>` element is **not** used.
+**Cause:** the field has no name Orbis can find: no `aria-label`, `aria-labelledby`, associated `<label>` (`for=` or wrapping), `placeholder`, `title` or text.
 
-**Fix:** target it with `label:<label text>` in code. For an LLM, also include the Markdown (`snapshot.markdown`), where the label text appears, or the `name`/`selector` fields. Shorter `selector`s such as `#email` usually carry the meaning.
+**Fix:** target it with its `selector` (for example `#email`) or `input[name="..."]` in code. For an LLM, also include the Markdown (`snapshot.markdown`) or the `name`/`selector` fields.
 
-### `fillForm` submitted the form when I only wanted to fill it
+### `fillForm` did not submit the form
 
-**Cause:** `agent.fillForm(fields, submit = true)` defaults to `submit = true`, and so do REST `/orbis/fill-form` and the Python `fill_form()`. **Verified:** filling one field navigated to the form's action URL.
+**Cause:** `fillForm()` only fills by default (TypeScript `agent.fillForm(fields, submit = false)`, Python `fill_form(fields, submit=False)`, REST `/orbis/fill-form` and LangChain). Before 0.2.0 it submitted by default.
 
-**Fix:** pass `false`, for example `agent.fillForm(fields, false)` or Python `fill_form(fields, submit=False)`.
+**Fix:** pass `true` or a submit button locator, for example `agent.fillForm(fields, true)`, `agent.fillForm(fields, 'text=Sign in')` or Python `fill_form(fields, submit=True)`.
 
 ### `fillForm` result lists fields in `skipped`
 
 The locator did not resolve on the current page. `skipped` contains the original keys. Check the locator against the current snapshot. A field may appear only after an earlier step, in which case use `steps` (see [typescript-sdk.md](./typescript-sdk.md)).
 
-### Typed passwords show up in snapshots and diffs
+### Where do typed values show up?
 
-Typed values are stored in the `value` attribute and reported as `value="..."` in the action map and diff. Redact them before sending them to a model. See [security.md](./security.md#7-keeping-secrets-away-from-the-llm).
+Typed values are not shown in action maps (`[FILLED]`) or diff summaries (`[filled]` / `[empty]`), and password values are never included. They are still part of the page, so raw HTML (`memora_html`, `--dump html`) and `evaluate()` results can contain them. See [security.md](./security.md#7-keeping-secrets-away-from-the-llm).
 
 ## Python SDK
 
 ### `select_option()` raises `HTTPError: HTTP Error 404: Not Found`
 
-> **Known issue (0.1.0):** the Python SDK posts to `/orbis/select-option`, which the server does not implement.
-
-**Workaround:** `act()` with text on a `<select>` selects the matching option (by value, exact text, then partial text):
-
-```python
-agent.act("label:Country", "India")      # instead of agent.select_option("label:Country", "India")
-```
+The `<select>` or the option was not found on the current page. Check the locator and the option's value or visible text against a fresh snapshot. (In versions before 0.2.0 this method always failed with 404; it works from 0.2.0.)
 
 ### Python SDK calls time out
 
 **Symptom:** `TimeoutError` / `socket.timeout` / `urllib.error.URLError: <urlopen error timed out>` from `goto()` or other calls.
 
-**Cause:** the SDK uses fixed timeouts: 5 s for `connect()`, 15 s for most calls, 10 s for `markdown()`. The daemon allows navigations up to 20 s, plus up to 5 s of settle time.
+**Cause:** the SDK waits up to 60 seconds per call by default (15 s before 0.2.0). The daemon allows navigations up to 20 s by default, plus up to 5 s of settle time, so a timeout usually means the daemon is unreachable or overloaded, or you set a shorter `timeout`.
 
 **Fix:**
+- Raise the client timeout: `OrbisAgent.connect(url, timeout=120)`.
 - Retry the call. The daemon may still finish the navigation, and a following `snapshot()` will show the result.
-- Call the REST API directly with your own HTTP client and a longer timeout:
-
-```python
-import json, urllib.parse, urllib.request
-url = "http://127.0.0.1:9222/orbis/goto?" + urllib.parse.urlencode({"url": "https://slow.example.com"})
-with urllib.request.urlopen(url, timeout=60) as r:
-    snap = json.loads(r.read())["snapshot"]
-```
 
 ### `ConnectionRefusedError` from `OrbisAgent.connect()`
 
-The daemon is not running, or it is listening on a different host or port. Start it with `orbis --port 9222` (see [getting-started.md](./getting-started.md)). If you started it with `--host 127.0.0.2`, connect to `http://127.0.0.2:9222`.
+The daemon is not running, or it is listening on a different host or port. Start it with `orbis --port 9222` (see [getting-started.md](./getting-started.md)). By default it listens on `127.0.0.1` only; to connect from another machine or container, start it with `--host 0.0.0.0`.
 
 ### Two Python agents interfere with each other
 
@@ -239,7 +224,7 @@ Check, in order:
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
-6. **Stray stdout output.** Add `"env": { "ORBIS_NO_TELEMETRY": "1" }`. If an update is announced, the update notice is printed on stdout, which is the MCP channel.
+6. **Stray stdout output.** Orbis writes its own notices (including the update notice) to stderr, so stdout carries only the MCP protocol. If something else in your launch command prints to stdout (for example a wrapper script), remove that output.
 7. **Tool names.** Tools are listed as `memora_*` (15 tools). `orbis_*` names are accepted as aliases when called, but they are not listed. See [mcp.md](./mcp.md).
 
 ### MCP pages behave differently on my laptop and in CI
@@ -252,11 +237,11 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"js
 
 `--obey-robots` is on, and the URL is disallowed for your `--robots-agent` token. If the origin's `robots.txt` returned a 5xx error or could not be fetched, **everything** on that origin is disallowed for 24 hours in that process. Restart the process to clear the cache after the site recovers. See [network-and-proxies.md](./network-and-proxies.md#robotstxt).
 
-### `--http-proxy` has no effect, and the banner mentions Orbis Cloud
+### The banner mentions Orbis Cloud when I use `--http-proxy`
 
-`--http-proxy` is a placeholder for an upcoming managed service in 0.1.0. Use `--use-env-proxy` with `HTTPS_PROXY`/`HTTP_PROXY`, or `network.proxy` in TypeScript. See [network-and-proxies.md](./network-and-proxies.md#7-proxies).
+That notice is informational. `--http-proxy` routes traffic through your proxy (`http://` sites as forward-proxy requests, `https://` sites through `CONNECT`); the `Proxy:` line of the banner shows the proxy in use. Before 0.2.0, `--http-proxy` did not route traffic. See [network-and-proxies.md](./network-and-proxies.md#7-proxies).
 
-### `... (407) â€” proxy rejected the credentials`
+### `... (407) — proxy rejected the credentials`
 
 The proxy credentials are wrong or missing. Put `user:pass@` in the proxy URL (percent-encode special characters), or use `--proxy-bearer-token` (HTTP(S) proxies only).
 
@@ -278,11 +263,11 @@ Do not attempt to bypass access controls you are not authorised to bypass.
 
 ### Screenshots are blank
 
-There is no rendering engine. CDP `Page.captureScreenshot` returns a 1Ã—1 transparent PNG, and WebDriver screenshots return a blank PNG. Use `snapshot.markdown`, `page.content()` or the action map instead. If you need pixels, use the MCP Chrome engine or a real browser.
+There is no rendering engine. CDP `Page.captureScreenshot` returns a 1×1 transparent PNG, and WebDriver screenshots return a blank PNG. Use `snapshot.markdown`, `page.content()` or the action map instead. If you need pixels, use the MCP Chrome engine or a real browser.
 
 ### Content inside an `<iframe>` or a web component's shadow DOM is missing
 
-Iframes are not loaded. WebDriver `switch_to.frame()` raises `no such frame: Frames are not supported yet`. Shadow DOM is not supported (`element.shadowRoot` is `null`, and WebDriver raises `no such shadow root`). **Fix:** navigate directly to the iframe's `src` URL. There is no workaround for shadow DOM content in 0.1.0.
+Iframes are not loaded. WebDriver `switch_to.frame()` raises `no such frame: Frames are not supported yet`. Shadow DOM is not supported (`element.shadowRoot` is `null`, and WebDriver raises `no such shadow root`). **Fix:** navigate directly to the iframe's `src` URL. There is no workaround for shadow DOM content.
 
 ### Selenium `driver.get()` returns before the page's data has loaded
 
@@ -294,7 +279,7 @@ Dialogs are not supported (see above). Stub `window.alert` with `driver.execute_
 
 ### After one Playwright script finished, other clients lost their pages
 
-`browser.close()` in a CDP client sends `Browser.close`, which closes **every** page in the daemon. Give each client its own daemon, or close only your own pages (`page.close()` / `context.close()`).
+From 0.2.0, `browser.close()` in a CDP client (`Browser.close`) closes only the pages that client created, so this should not happen. In earlier versions it closed every page in the daemon; upgrade, or give each client its own daemon.
 
 ### `File uploads are not supported by Memora`
 
@@ -304,9 +289,10 @@ Dialogs are not supported (see above). Stub `window.alert` with `driver.execute_
 
 | Message | Fix |
 | :--- | :--- |
-| `Session file not found: <path>` | The path is resolved on the machine and working directory of the process that loads it (the daemon for Python/REST, the MCP server for MCP). Use absolute paths. |
+| `Session file not found: <path>` | The path is resolved on the machine of the process that loads it (the daemon for Python/REST, the MCP server for MCP), relative to its session folder (the folder it was started in, or `ORBIS_SESSION_DIR`). |
+| `Session files must be inside ...` / `Session files must end in .json` (HTTP 403, `ERR_SESSION_PATH`) | The daemon and the MCP server only read and write `.json` files inside their session folder. Use a relative path such as `app.json`, or set `ORBIS_SESSION_DIR`. |
 | `Unsupported session version: X. Expected version 1` | The file is not an Orbis v1 session. See the format in [sessions-and-auth.md](./sessions-and-auth.md#2-session-file-format-version-1). |
-| Logged out after navigating although the session loaded | The application probably stores its token in `localStorage`, which does not survive navigation in the native engine. See [sessions-and-auth.md](./sessions-and-auth.md#8-native-engine-behaviour-you-must-know). |
+| Logged out after navigating although the session loaded | If the application keeps its token in `localStorage`, the storage was restored into a different origin. Load a page of the application before loading the session. See [sessions-and-auth.md](./sessions-and-auth.md#8-native-engine-behaviour-you-must-know). |
 
 ## Diagnostic toolkit
 
@@ -346,16 +332,16 @@ It is a rough estimate: the characters of the title, action map and Markdown, di
 Not through the REST/Python API, because all requests use one default page. Use one daemon per agent, separate CDP pages, or WebDriver sessions. See [production-deployment.md](./production-deployment.md#2-capacity-and-isolation-model).
 
 **Does the API key protect my daemon?**
-No. In 0.1.0 the server does not check it. Use network isolation and a gateway (see [security.md](./security.md)).
+Yes, from 0.2.0. When `ORBIS_API_KEY` is set, the CDP/REST server and the WebDriver server refuse every request and connection that does not send the key (HTTP 401). Selenium can send it in the server URL: `http://orbis:<key>@127.0.0.1:9515`. Combine the key with network isolation (see [security.md](./security.md)).
 
 **How fast is `fork()`?**
-`fork()` serialises the current DOM, cookies and storage, and re-parses them into a new page. On small pages it took about 5â€“6 ms in our tests; it grows with page size. JavaScript state and event listeners attached by scripts are **not** copied (see [limitations.md](./limitations.md)).
+`fork()` serialises the current DOM, cookies and storage, and re-parses them into a new page. On small pages it took about 5–6 ms in our tests; it grows with page size. JavaScript state and event listeners attached by scripts are **not** copied (see [limitations.md](./limitations.md)).
 
 **Can Orbis download files or render PDFs?**
 No. See [limitations.md](./limitations.md).
 
 **Which numbers can I quote for performance?**
-Only measured ones, with their context. On a Windows 11 laptop (Node 22, October 2026, 200 local test pages, median of three runs), Orbis loaded the pages in 0.31 s against 3.4 s for headless Chrome. With 10 tabs open it used 107 MB against 1,154 MB. On four test fixtures, distillation produced 33â€“40% fewer tokens than the raw HTML. Your results will differ; measure your own workload.
+Only measured ones, with their context. On a Windows 11 laptop (Node 22, October 2026, 200 local test pages, median of three runs), Orbis loaded the pages in 0.31 s against 3.4 s for headless Chrome. With 10 tabs open it used 107 MB against 1,154 MB. On four test fixtures, distillation produced 33–40% fewer tokens than the raw HTML. Your results will differ; measure your own workload.
 
 **Is Orbis free to use in production?**
 No. The Community Evaluation License covers evaluation, development and proof-of-concept work. Production use requires a commercial license. See [LICENSE.md](../LICENSE.md) and [production-deployment.md](./production-deployment.md#licensing).

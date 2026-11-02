@@ -1,4 +1,4 @@
-# `memora-orbis` â€” Python SDK for Orbis
+# `memora-orbis` — Python SDK for Orbis
 
 The Python SDK for [Orbis by Memora](https://orbis.memora.company), the lightweight headless browser for AI agents. It is a small HTTP client (standard library only) that talks to an Orbis daemon running on Node.js, and returns pages as a numbered action map plus Markdown.
 
@@ -56,7 +56,7 @@ print(result["submitted"], result["url"])
 | `act(target, text=None)` | `dict` | `{"success": bool, "snapshot": {...}}` |
 | `fill_form(fields, submit=True)` | `dict` | Submits by default |
 | `save_session(path)` / `load_session(path)` | `dict` | Paths are on the **daemon's** machine |
-| `select_option(target, value)` | â€” | **Broken in 0.1.0** (HTTP 404). Use `act(target, value)` on the `<select>` |
+| `select_option(target, value)` | — | **Broken in 0.1.0** (HTTP 404). Use `act(target, value)` on the `<select>` |
 | `to_browser_use()` / `to_langchain_tools()` | `dict` / list | See [Agent frameworks](../docs/integrations.md) |
 
 `OrbisSnapshot` fields: `url`, `title`, `markdown`, `action_map_text`, `actions`, `token_estimate`, `interactive_count`, `raw`.

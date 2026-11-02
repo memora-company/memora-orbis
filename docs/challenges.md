@@ -1,6 +1,6 @@
 # CAPTCHAs, Bot Checks and Rate Limits
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 Orbis **detects** CAPTCHAs, bot-management interstitials, WAF block pages and rate limits, tells your code or agent about them, and backs off. It can also hand a check to a **person** in a visible Chrome window (MCP only). It does **not** solve challenges, inject solver tokens, transcribe audio challenges, or retry through other proxies or identities, and none of that is planned. See [Responsible use](./stealth.md#responsible-use).
 
@@ -65,7 +65,7 @@ Default behaviour (`onChallenge: 'report'`):
 MCP output for a blocking challenge:
 
 ```
-# CHALLENGE DETECTED â€” page content not available
+# CHALLENGE DETECTED — page content not available
 Vendor: cloudflare | Kind: interstitial | Confidence: high
 Evidence: header cf-mitigated=challenge; title "Just a moment..."
 URL: https://example.com/ [HTTP 403]
@@ -119,7 +119,7 @@ Details and limits:
 
 - **Timeout:** `--handoff-timeout <sec>` (default 300, minimum 10). On expiry the window closes and the state becomes `expired`. Closing the window by hand gives `cancelled`.
 - **Needs a display and Chrome/Edge.** On Linux without `DISPLAY`/`WAYLAND_DISPLAY` (servers, containers), or without Chrome/Edge at the [known paths](./mcp.md#engine-selection), `start` returns `unavailable` with the reason.
-- **The session stays in Chrome.** Cookies are not copied between the window and the native engine. Clearance cookies are tied to the browser that earned them, and the native cookie jar is not domain-scoped (see [limitations.md](./limitations.md)). After a handoff from the native engine, earlier native-engine cookies are no longer used.
+- **The session stays in Chrome.** Cookies are not copied between the window and the native engine. Clearance cookies are tied to the browser that earned them. After a handoff from the native engine, earlier native-engine cookies are no longer used.
 - **User-Agent:** the handoff window uses the installed browser's own User-Agent, not the Chrome 130 UA the headless engines send, because a mismatched UA makes checks fail for the person.
 - **One handoff at a time** per MCP server.
 - **The person does the check.** Orbis does not click, type or solve anything in the handoff window.
@@ -162,13 +162,13 @@ try {
 | :--- | :--- | :--- |
 | SDK | throws `ChallengeDetectedError` | throws `ChallengeCooldownError` |
 | CDP `Page.navigate` | `errorText: "net::ERR_BLOCKED_BY_RESPONSE"` | `errorText: "net::ERR_BLOCKED_BY_CLIENT"` |
-| WebDriver | `unknown error`: `Navigation failed: â€¦` | `unknown error`: `Navigation failed: â€¦` |
+| WebDriver | `unknown error`: `Navigation failed: …` | `unknown error`: `Navigation failed: …` |
 | MCP | `isError: true`, challenge block plus handoff hint | `isError: true`, cooldown message plus handoff hint |
 | REST (`/orbis/goto`, `/orbis/fill-form`) | `409`, `code: "ERR_CHALLENGE_DETECTED"` | `429` with `Retry-After`, `code: "ERR_CHALLENGE_COOLDOWN"` |
 | Python SDK | raises `ChallengeDetectedError` (subclass of `HTTPError`) | raises `ChallengeCooldownError` (subclass of `HTTPError`) |
 
 In report mode, REST responses carry a `challenge` field and Python snapshots have `snap.challenge` / `snap.blocked`; see [http-api.md](./http-api.md) and [python-sdk.md](./python-sdk.md).
-| `orbis fetch` | `Fetch error: â€¦` on stderr, exit 1 | `Fetch error: â€¦` on stderr, exit 1 |
+| `orbis fetch` | `Fetch error: …` on stderr, exit 1 | `Fetch error: …` on stderr, exit 1 |
 
 ## 8. Accuracy and limits
 

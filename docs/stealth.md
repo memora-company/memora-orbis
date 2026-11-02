@@ -2,7 +2,7 @@
 
 Orbis ships with a "stealth" profile that makes its HTTP requests and its JavaScript environment look like desktop Chrome 130 on Windows. This page lists what that profile changes and what it doesn't, and it gives guidance on using it responsibly. Read it before you rely on stealth to reach any site. Stealth is a consistency layer, not an anti-bot bypass, and 0.1.0 makes no promise that any particular bot-detection product will let you through.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -13,7 +13,7 @@ Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on
 - [Overriding the User-Agent](#overriding-the-user-agent)
 - [The Chrome engine (MCP only)](#the-chrome-engine-mcp-only)
 - [What stealth does not do](#what-stealth-does-not-do)
-- [Detectable inconsistencies in 0.1.0](#detectable-inconsistencies-in-010)
+- [Detectable inconsistencies](#detectable-inconsistencies)
 - [Responsible use](#responsible-use)
 - [Related documents](#related-documents)
 
@@ -66,7 +66,7 @@ Orbis runs page scripts in a Node.js `vm` context with its own DOM. There is no 
 | `navigator.language` / `languages` | `en-US` / `['en-US', 'en']` |
 | `navigator.hardwareConcurrency` / `deviceMemory` | `8` / `8` |
 | `navigator.cookieEnabled` / `onLine` | `true` / `true` |
-| `screen` | 1920 Ã— 1080, `availHeight` 1040, 24-bit colour |
+| `screen` | 1920 × 1080, `availHeight` 1040, 24-bit colour |
 
 When stealth is on, a script from `generateStealthScript()` runs in each new page context before any page script. It:
 
@@ -75,7 +75,7 @@ When stealth is on, a script from `generateStealthScript()` runs in each new pag
 - adds `navigator.mediaDevices.enumerateDevices()`, which returns one fake audio input and one fake video input;
 - adds `navigator.getBattery()`, which resolves to a charging battery at level 1.0;
 - adds `window.chrome` with `app`, `runtime`, `loadTimes()` and `csi()`;
-- replaces `window.screen` with a 1920 Ã— 1080 object;
+- replaces `window.screen` with a 1920 × 1080 object;
 - patches `navigator.permissions.query` so it reports `notifications` as `default`. `navigator.permissions` doesn't exist in the native sandbox, so in practice this patch does nothing.
 
 ## What `--no-stealth` actually changes
@@ -90,15 +90,15 @@ So "stealth off" does **not** produce an honest, self-identifying client. To ide
 
 ## Overriding the User-Agent
 
-`--user-agent "<ua>"` (CLI) or `network: { userAgent }` / `userAgent` (SDK) replaces the `User-Agent` **request header** on navigations, subresources, `fetch()` calls and robots.txt fetches. It doesn't touch the rest of the profile:
+`--user-agent "<ua>"` (CLI) or `network: { userAgent }` / `userAgent` (SDK) replaces the `User-Agent` **request header** on navigations, subresources, `fetch()` calls and robots.txt fetches, and `navigator.userAgent` in page JavaScript:
 
 | Signal | After `--user-agent "AcmeBot/1.0"` |
 | :--- | :--- |
 | `User-Agent` header | `AcmeBot/1.0` |
-| `Sec-Ch-Ua*` headers | Still Chrome 130 |
-| `navigator.userAgent` in page JS | Still the Chrome 130 string |
+| `Sec-Ch-Ua*` headers | Not sent (they are dropped when the custom UA is not a Chrome UA) |
+| `navigator.userAgent` in page JS | `AcmeBot/1.0` |
 
-Sites that compare the header with `navigator.userAgent`, or the UA with the Client Hints, will see the mismatch. If you identify as a bot, that is fine and expected. Just don't expect a custom UA to look like a real browser. Changing the UA also doesn't change which robots.txt group applies. Use `--robots-agent` for that (see [network-and-proxies.md](network-and-proxies.md)).
+The rest of the profile (`navigator.platform`, `screen` and so on) still looks like Chrome on Windows. If you identify as a bot, that is fine and expected. Just don't expect a custom UA to look like a real browser. Changing the UA also doesn't change which robots.txt group applies. Use `--robots-agent` for that (see [network-and-proxies.md](network-and-proxies.md)).
 
 ## The Chrome engine (MCP only)
 
@@ -108,18 +108,16 @@ When the MCP server runs with `--engine chrome`, or `--engine auto` on a machine
 
 - **TLS and HTTP fingerprints.** Requests use Node.js's TLS stack through undici, so JA3/JA4 and HTTP/2 settings are Node's, not Chrome's. Header order and casing also differ from Chrome. Earlier marketing text claimed JA3/JA4 spoofing; the 0.1.0 source does not do this.
 - **Canvas, WebGL and audio fingerprinting.** There is no canvas: `HTMLCanvasElement` and `WebGLRenderingContext` are `undefined` in page JS. Scripts that probe these APIs get errors or `undefined`, which is itself a strong signal.
-- **Layout, fonts and rendering.** Element sizes are synthetic, there is no font enumeration, and screenshots are a 1Ã—1 placeholder image (see [limitations.md](limitations.md)).
-- **CAPTCHAs and challenges.** Orbis doesn't solve CAPTCHAs, Turnstile, hCaptcha or JavaScript proof-of-work challenges. Many challenge pages need APIs the sandbox lacks (`XMLHttpRequest`, `crypto`, `requestAnimationFrame`, workers), so they simply don't complete. Unreleased builds **detect** them, back off, and can hand them to a person in a visible window; see [challenges.md](challenges.md).
+- **Layout, fonts and rendering.** Element sizes are synthetic, there is no font enumeration, and screenshots are a 1×1 placeholder image (see [limitations.md](limitations.md)).
+- **CAPTCHAs and challenges.** Orbis doesn't solve CAPTCHAs, Turnstile, hCaptcha or JavaScript proof-of-work challenges. Many challenge pages need APIs the sandbox lacks (`crypto`, workers, real layout), so they simply don't complete. Since 0.1.2, Orbis **detects** them, backs off, and can hand them to a person in a visible window; see [challenges.md](challenges.md).
 - **Guaranteed access.** There is no recorded measurement of Orbis passing Cloudflare, DataDome or similar bot-management checks; earlier "100% passed" claims are not backed by data. Assume that sites with active bot management may block Orbis, and design for that: handle 403/429/503 responses, back off, and stop.
-- **Proxy rotation and IP reputation.** Stealth doesn't change your IP address. The managed proxy flags (`--http-proxy`, `--proxy-bearer-token`) are reserved for Orbis Cloud and currently only print a notice (see [network-and-proxies.md](network-and-proxies.md)).
+- **Proxy rotation and IP reputation.** Stealth doesn't change your IP address. To use your own proxy, pass `--http-proxy <url>` or `--use-env-proxy`; Orbis does not rotate proxies for you (see [network-and-proxies.md](network-and-proxies.md)).
 
-## Detectable inconsistencies in 0.1.0
+## Detectable inconsistencies
 
 > **Known issue (0.1.0):** The navigation request declares `Sec-Fetch-Dest: document` but goes out with `sec-fetch-mode: cors` because the HTTP client overrides that header. A real Chrome navigation sends `navigate`.
 
-> **Known issue (0.1.0):** `--user-agent` changes only the request header. `navigator.userAgent` and the `Sec-Ch-Ua` Client Hints keep the Chrome 130 values, so the two disagree.
-
-> **Known issue (0.1.0):** Many standard browser globals are missing in page JS, including `XMLHttpRequest`, `WebSocket`, `requestAnimationFrame`, `getComputedStyle`, `crypto`, `performance`, `Event`, `alert` and `history`. A script that checks for them can tell it isn't running in a real browser, whatever stealth reports.
+> **Known issue:** Some standard browser globals are missing in page JS, including `WebSocket`, `Worker`, `crypto`, `indexedDB`, `customElements` and `alert`/`confirm`/`prompt`, and some others (such as the observers) are stubs. A script that checks for them can tell it isn't running in a real browser, whatever stealth reports.
 
 ## Responsible use
 

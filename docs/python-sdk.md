@@ -2,7 +2,7 @@
 
 The Python SDK (`memora-orbis` on PyPI) is a small HTTP client for a running Orbis daemon. It does not contain a browser engine. Every method sends one HTTP request to the daemon's agent REST API (`/orbis/*`, see [http-api.md](./http-api.md)), and the daemon does the work. This page documents every public class and method, what each one sends and returns, and the operational details you need before you use it in production.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -26,11 +26,11 @@ Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on
 ## How the SDK works
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   HTTP (JSON)    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ your Python process  â”‚ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¶ â”‚ Orbis daemon (Node.js)         â”‚
-â”‚ orbis.OrbisAgent     â”‚ â—€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â”‚ `orbis --port 9222`            â”‚
-â”‚ (urllib, no deps)    â”‚                  â”‚ one shared "default page"      â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜                  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌──────────────────────┐   HTTP (JSON)    ┌───────────────────────────────┐
+│ your Python process  │ ───────────────▶ │ Orbis daemon (Node.js)         │
+│ orbis.OrbisAgent     │ ◀─────────────── │ `orbis --port 9222`            │
+│ (urllib, no deps)    │                  │ one shared "default page"      │
+└──────────────────────┘                  └───────────────────────────────┘
 ```
 
 Key facts, all taken from `python/orbis/agent.py` and `src/cdp/server.ts`:
@@ -41,7 +41,7 @@ Key facts, all taken from `python/orbis/agent.py` and `src/cdp/server.ts`:
 | Every call is a blocking HTTP request. | Calls block the calling thread. Use threads or `asyncio.to_thread` for concurrency (see below). |
 | All REST endpoints operate on the daemon's **default page**, which is the first page the daemon created. | Two agents talking to the same daemon share one page, one cookie jar and one history. Run one daemon per concurrent agent. |
 | The daemon keeps all state (DOM, cookies, storage). | Nothing is lost if your Python process restarts. All of it is lost if the daemon restarts, unless you saved a session. |
-| File paths passed to `save_session` / `load_session` are resolved **on the daemon's machine**. | In Docker or on a remote host, the file is written inside the daemon's container or host, not next to your script. |
+| File paths passed to `save_session` / `load_session` are resolved **on the daemon's machine**, inside the folder the daemon was started in (or `ORBIS_SESSION_DIR`). | In Docker or on a remote host, the file is written inside the daemon's container or host, not next to your script. Paths outside that folder are refused. |
 
 ## Installation
 
@@ -115,24 +115,25 @@ print(delta["diff"]["summary"])       # what changed since the last snapshot
 
 ```python
 class OrbisAgent:
-    def __init__(self, base_url: str = "http://localhost:9222", api_key: Optional[str] = None)
+    def __init__(self, base_url: str = "http://localhost:9222", api_key: Optional[str] = None, timeout: float = 60)
 ```
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `base_url` | `str` | `"http://localhost:9222"` | Daemon origin. A trailing `/` is stripped. Use the HTTP origin, not the `ws://` URL. |
 | `api_key` | `str \| None` | `None` | Sent as both `x-api-key: <key>` and `Authorization: Bearer <key>` on every request. If omitted, falls back to the `ORBIS_API_KEY` environment variable, then `MEMORA_API_KEY`. |
+| `timeout` | `float` | `60` | Seconds to wait for each response from the daemon. |
 
 The constructor does not contact the daemon. Use `connect()` to check that the daemon is reachable.
 
-> **Known issue (0.1.0):** The daemon does not check the API key. `CDPServer` reads it but never calls its authorization check, so every request is accepted with or without a key. Sending a key is harmless and keeps your code ready for a fixed release. Do not rely on it for security. See [security.md](./security.md).
+When the daemon was started with `ORBIS_API_KEY`, it rejects requests without the right key with HTTP 401, so pass the same key here (or set the environment variable). See [security.md](./security.md).
 
-#### `OrbisAgent.connect(base_url="http://localhost:9222", api_key=None)` (classmethod)
+#### `OrbisAgent.connect(base_url="http://localhost:9222", api_key=None, timeout=60)` (classmethod)
 
-Creates an agent and calls `GET /json/version` with a 5-second timeout to check the daemon is reachable.
+Creates an agent and calls `GET /json/version` to check the daemon is reachable.
 
 - **Returns:** `OrbisAgent`
-- **Raises:** `urllib.error.URLError` if nothing is listening (for example `ConnectionRefusedError`), `socket.timeout` / `TimeoutError` after 5 s, `ConnectionError` if the daemon answers with a non-200 status.
+- **Raises:** `urllib.error.URLError` if nothing is listening (for example `ConnectionRefusedError`), `socket.timeout` / `TimeoutError` after `timeout` seconds, `ConnectionError` if the daemon answers with a non-200 status (for example 401 for a missing or wrong API key).
 
 ```python
 agent = OrbisAgent.connect("http://orbis.internal:9222", api_key="...")
@@ -146,7 +147,7 @@ Navigates the daemon's default page to `url` and returns the semantic snapshot o
 - **Behaviour on the daemon:** fetches the URL (following redirects), parses the HTML, runs the page's scripts, waits up to 5 s for the page's async work (fetch/XHR, short timers) to settle, then builds the snapshot. Navigation timeout is 20 s on the daemon.
 - **Returns:** an [`OrbisSnapshot`](#orbissnapshot).
 - **Raises:** `urllib.error.HTTPError` with status 500 if navigation fails (DNS error, timeout, blocked by `--obey-robots`, etc.). The response body contains `{"error": "..."}`.
-- **Challenges (unreleased):** if the page is a CAPTCHA, bot check, block page or 429, `snap.challenge` describes it and `snap.blocked` is `True`. With a daemon started with `--on-challenge stop` it raises `ChallengeDetectedError` (HTTP 409) instead. While the host is in cooldown it raises `ChallengeCooldownError` (HTTP 429). Both are subclasses of `urllib.error.HTTPError`. See [challenges.md](./challenges.md).
+- **Challenges (0.1.2+):** if the page is a CAPTCHA, bot check, block page or 429, `snap.challenge` describes it and `snap.blocked` is `True`. With a daemon started with `--on-challenge stop` it raises `ChallengeDetectedError` (HTTP 409) instead. While the host is in cooldown it raises `ChallengeCooldownError` (HTTP 429). Both are subclasses of `urllib.error.HTTPError`. See [challenges.md](./challenges.md).
 
 The HTTP status of the target page is not exposed. The daemon returns it as a top-level `status` field, but `goto()` keeps only the nested `snapshot` object. A 404 or 500 page from the target site still produces a snapshot. If the status matters, call `agent._get("/orbis/goto", {"url": url})` and read `["status"]`.
 
@@ -166,7 +167,7 @@ Returns a fresh snapshot of the current page without navigating.
 - **HTTP:** `GET /orbis/snapshot?focus=...&exclude=...`
 - **Returns:** `OrbisSnapshot`
 
-> **Important:** action IDs in a *focused* snapshot are numbered from `@1` inside the focused subtree, but `act()` resolves `@N` against the **whole** page. Do not pass `@N` values taken from a focused snapshot to `act()` or `fill_form()`. Use the `selector` field from `snap.actions` instead. See [locators.md](./locators.md).
+Action IDs in a *focused* snapshot are numbered from `@1` inside the focused subtree, and `act()` and `fill_form()` resolve them to the elements shown in that snapshot. See [locators.md](./locators.md).
 
 ```python
 snap = agent.snapshot(focus_selector="main", exclude_selectors=["aside", ".ads"])
@@ -178,7 +179,7 @@ for a in snap.actions:
 
 Returns the current page as clean Markdown (scripts, styles, hidden elements removed).
 
-- **HTTP:** `GET /orbis/snapshot?format=markdown` (10-second client timeout)
+- **HTTP:** `GET /orbis/snapshot?format=markdown`
 - **Returns:** `str`. Focus and exclude filters are not available through this method. Use `snapshot(...).markdown` for filtered Markdown.
 
 #### `diff() -> dict`
@@ -187,7 +188,7 @@ Compares the current page with the previous snapshot taken on the daemon's defau
 
 - **HTTP:** `GET /orbis/diff`
 - **Returns:** `{"diff": PageDiff, "currentSnapshot": SemanticPageSnapshot}`. The shapes are listed in [Return value shapes](#return-value-shapes).
-- Every snapshot the daemon takes (including the one inside `goto`, `act` and `fill_form`) becomes the new baseline. `diff()` itself also takes a snapshot, so calling it twice in a row returns "No visual, DOM, or interactive changes detected." the second time.
+- Snapshots taken by `goto`, `snapshot` and `fill_form` become the new baseline. The snapshot returned by `act()` does not, so `diff()` right after `act()` shows what the action changed. `diff()` itself also takes a snapshot, so calling it twice in a row returns "No visual, DOM, or interactive changes detected." the second time.
 - Elements are matched by their generated CSS `selector`, not by action ID.
 
 ```python
@@ -208,44 +209,46 @@ Clicks an element, or types into it when `text` is given.
 | `text` | If provided, the value is set on the element and `input` and `change` events are dispatched. If the target is a `<select>`, the matching option is selected instead (value first, then exact visible text, then partial text). |
 
 - **HTTP:** `POST /orbis/act` with `{"actionId": ..., "type": "click"|"type", "text": ...}`
-- **Returns:** `{"success": bool, "snapshot": SemanticPageSnapshot}`. `success` is `False` when the locator matched nothing. It does not raise.
+- **Returns:** `{"success": bool, "url": str, "snapshot": SemanticPageSnapshot}`. `success` is `False` when the locator matched nothing. It does not raise.
 
-> **Known issue (0.1.0):** A click through `act()` dispatches a DOM `click` event only. It does **not** perform the browser's default action: it does not follow `<a href>` links and does not submit forms. Page JavaScript that listens for `click` still runs. To follow a link, call `goto()` with the link's `href` (available in `snap.actions[i]["href"]`). To submit a form, use `fill_form(..., submit=...)`, which does perform real submission. The MCP tool `memora_act` and the TypeScript `page.activate()` do perform default actions.
+A click works like a real click: page JavaScript that listens for `click` runs, links are followed and submit buttons submit their form. When the click navigates, `act()` returns after the new page has loaded.
 
 ```python
 agent.act("label:Email", "ops@example.com")
-agent.act("@7")                         # click
-
-# Follow a link reliably
-link = next(a for a in agent.snapshot().actions if a["text"] == "Pricing")
-agent.goto(link["href"])                # relative hrefs are resolved against the current page
+agent.act("@7")                         # click: follows links, submits forms
+agent.act("text=Pricing")               # follow a link by its text
 ```
 
 #### `select_option(target: str, value_or_text: str) -> dict`
 
-Intended to select a dropdown option.
+Selects an option in a `<select>` element, by option value or visible text.
 
-> **Known issue (0.1.0):** This method posts to `/orbis/select-option`, an endpoint the daemon does not implement. It always raises `urllib.error.HTTPError: HTTP Error 404: Not Found` (verified against the 0.1.0 build). Use `act(target, option)` instead. When the target is a native `<select>`, typing delegates to option selection:
->
-> ```python
-> agent.act("label:Country", "India")      # selects the <option> whose value or text matches "India"
-> agent.act("#country", "IN")              # match on the option value also works
-> ```
->
-> `fill_form({"label:Country": "India"}, submit=False)` also works. It matches the option `value` exactly, then the exact visible text.
+- **HTTP:** `POST /orbis/select-option` with `{"target": ..., "value": ...}`
+- **Returns:** `{"success": true, "url": str, "snapshot": SemanticPageSnapshot}`
+- **Raises:** `urllib.error.HTTPError` (404) when the select or the option is not found.
 
-#### `fill_form(fields: dict[str, str], submit: bool = True) -> dict`
+```python
+agent.select_option("label:Country", "India")
+```
 
-Fills several fields in one request and, by default, submits the form.
+`act(target, option)` on a `<select>` and `fill_form({"label:Country": "India"})` also select options.
+
+#### `fill_form(fields: dict[str, str], submit: Union[bool, str] = False) -> dict`
+
+Fills several fields in one request and, if you ask for it, submits the form.
+
+> **Changed in 0.2.0:** `submit` defaults to `False`, so the form is only filled. Earlier versions submitted by default. Pass `submit=True` or a submit button locator to submit.
 
 | Parameter | Description |
 | :--- | :--- |
 | `fields` | Mapping of locator to value. Locators can be any format from [locators.md](./locators.md). Checkboxes and radios are checked when the value is one of `"true"`, `"1"`, `"yes"`, `"checked"`, `"on"`, and unchecked otherwise. `<select>` elements match the option value, then the exact text. `contenteditable` elements get their text replaced. |
-| `submit` | **Defaults to `True`.** `True` submits the form that contains the first filled field (or the first form on the page). `False` fills only. The REST endpoint also accepts a locator string for the button to click, but the Python signature is typed `bool`. Passing a string works at runtime. |
+| `submit` | Defaults to `False` (fill only). `True` submits the form that contains the first filled field (or the first form on the page). A locator string (for example `"text=Sign in"`) clicks that button instead. |
 
 - **HTTP:** `POST /orbis/fill-form` with `{"fields": {...}, "submit": ...}`
-- **Returns:** `{"success": true, "filled": [...], "skipped": [...], "fieldsFilled": int, "submitted": bool, "url": str, "title": str, "snapshot": SemanticPageSnapshot}`
-- Locators that match nothing are listed in `skipped`. They do not raise. Always check `skipped` in production code.
+- **Returns:** `{"success": bool, "filled": [...], "skipped": [...], "fieldsFilled": int, "submitted": bool, "url": str, "title": str, "snapshot": SemanticPageSnapshot}`
+- Locators that match nothing are listed in `skipped`. They do not raise. `success` is `False` when a field was skipped or a submit you asked for did not happen. Check `success` (or `skipped`) in production code.
+
+> **Changed in 0.2.0:** in 0.1.x `success` was always `True`, even when fields were skipped.
 - Submission performs a real form submission: GET forms navigate with a query string, POST forms send `application/x-www-form-urlencoded`. A page script that calls `event.preventDefault()` on `submit` stops the navigation. File inputs are never submitted.
 
 ```python
@@ -261,10 +264,11 @@ if res["skipped"]:
 
 #### `save_session(file_path: str) -> dict`
 
-Writes the default page's cookies, `localStorage` and `sessionStorage` to a JSON file **on the daemon's filesystem**. Parent directories are created.
+Writes the default page's cookies, `localStorage` and `sessionStorage` to a JSON file **on the daemon's filesystem**. Parent directories are created. The path must end in `.json` and lie inside the folder the daemon was started in (or `ORBIS_SESSION_DIR`, if set); relative paths are resolved against that folder.
 
 - **HTTP:** `POST /orbis/session/save` with `{"filePath": ...}`
 - **Returns:** `{"success": true, "filePath": "..."}`
+- **Raises:** `HTTPError 403` if the path is outside the session folder or does not end in `.json`.
 
 The file contains session cookies in plain text. Treat it as a secret (file permissions, encrypted volume, never commit it).
 
@@ -274,7 +278,7 @@ Restores a session file **from the daemon's filesystem** into the default page. 
 
 - **HTTP:** `POST /orbis/session` with `{"filePath": ...}`
 - **Returns:** `{"success": true, "url": "<current page url>"}`
-- **Raises:** `HTTPError 400` if the file is missing or not a valid version-1 session.
+- **Raises:** `HTTPError 400` if the file is missing or not a valid version-1 session, `HTTPError 403` if the path is outside the session folder or does not end in `.json`.
 
 If the daemon runs elsewhere, restore by value through the REST API instead of by path. Send `{"session": {...}}` to `POST /orbis/session`. The SDK has no method for this, so call it directly (see the [session vault example](#3-session-vault-that-works-with-a-remote-daemon)).
 
@@ -297,7 +301,7 @@ Returns three LangChain tools built with `langchain.tools.tool`:
 
 #### Methods that do not exist
 
-There is no `close()`, `fork()`, `extract()`, `evaluate()` or `back()` in the Python SDK. Pages live on the daemon until it restarts. To drop the current document, navigate to a data URL such as `agent.goto("data:text/html,<title>idle</title>")`. Navigating to `about:blank` fails with "about scheme is not supported". Cookies persist on the page until you restart the daemon. For extraction and JavaScript evaluation, use the MCP server ([mcp.md](./mcp.md)) or the TypeScript SDK ([typescript-sdk.md](./typescript-sdk.md)).
+There is no `close()`, `fork()`, `extract()`, `evaluate()` or `back()` in the Python SDK. Pages live on the daemon until it restarts. To drop the current document, navigate to `about:blank` (`agent.goto("about:blank")`). Cookies persist on the page until you restart the daemon. For extraction and JavaScript evaluation, use the MCP server ([mcp.md](./mcp.md)) or the TypeScript SDK ([typescript-sdk.md](./typescript-sdk.md)).
 
 ### OrbisSnapshot
 
@@ -355,13 +359,13 @@ Optional keys are omitted when empty, so use `.get()`.
 ```
 === INTERACTIVE ACTION MAP (3 elements) ===
 [@1] [link] "Go next" href="/next" (selector: html:nth-of-type(1) > body:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(1))
-[@2] [input] "[Untitled input]" (selector: #email)
+[@2] [input] "Email" (selector: #email)
 [@3] [button] "Send" type="submit" (selector: ...)
 ```
 
-Values you type are written to the element's `value` attribute, so they appear as `value="..."` in later action maps and in diff summaries. That includes passwords. Do not log snapshots or send them to third parties after typing secrets, and redact `value` for `type="password"` fields if you store transcripts.
+Values you type are not shown: a filled text field appears as `[FILLED]` in later action maps, diff summaries show `[filled]` or `[empty]`, and password values are never included.
 
-The text of an action comes from `aria-label`, then `placeholder`, `title`, `value`, then text content. `<label for>` text is **not** used. An input that is only labelled by a `<label>` element shows as `"[Untitled input]"`. Target such fields with `label:...` locators.
+The text of an action is the element's name: `aria-label`, an associated `<label>` (`for=` or a wrapping label), `placeholder`, `title` or its text content. Text you type never becomes the name.
 
 **Diff** (`agent.diff()["diff"]`):
 
@@ -391,7 +395,9 @@ The SDK does not wrap errors, except for the two challenge errors below, which s
 | `ChallengeCooldownError` (429) | The host is paused after a challenge. Attributes: `host`, `remaining_sec`, `challenge`, `body`; `headers["Retry-After"]`. |
 | `urllib.error.URLError` | Daemon not reachable (refused, DNS failure). |
 | `TimeoutError` / `socket.timeout` | Client-side timeout expired (see [Timeouts](#timeouts)). |
-| `urllib.error.HTTPError` (404) | Unknown endpoint, `select_option()`, or the page id was not found. |
+| `urllib.error.HTTPError` (401) | The daemon requires an API key and none (or a wrong one) was sent. |
+| `urllib.error.HTTPError` (403) | Session file path outside the daemon's session folder, or not ending in `.json`. |
+| `urllib.error.HTTPError` (404) | Unknown endpoint, `select_option()` found no matching select or option, or the page id was not found. |
 | `urllib.error.HTTPError` (400) | Malformed body, missing `fields`, invalid session file. |
 | `urllib.error.HTTPError` (500) | Navigation failed (network error, timeout, robots.txt block). |
 | `json.JSONDecodeError` | Response was not JSON (wrong port, a proxy error page). |
@@ -438,37 +444,15 @@ Be careful when you retry state-changing calls (`act`, `fill_form`). A retry aft
 
 ## Timeouts
 
-Client timeouts are hard-coded in `agent.py`:
-
-| Call | Client timeout |
-| :--- | :--- |
-| `connect()` | 5 s |
-| `markdown()` | 10 s |
-| every other call (`goto`, `snapshot`, `diff`, `act`, `fill_form`, sessions) | 15 s |
-
-The daemon's own navigation timeout is 20 s, plus up to 5 s of settle time for page scripts. **A slow page can therefore make `goto()` raise a client timeout while the daemon is still loading.** The daemon finishes the navigation anyway. A later `snapshot()` returns the loaded page.
-
-Options:
-
-1. Treat a `goto()` timeout as "maybe loaded": catch it, then call `snapshot()` and check `snap.url`.
-2. Lower the daemon timeout so it fails first: start it with `--http-timeout 12000` (this bounds the HTTP fetch of each navigation).
-3. Subclass to raise the limit:
+Every call, including `connect()`, waits up to **60 seconds** by default. Change it when you create the agent:
 
 ```python
-import json, urllib.request
-from orbis import OrbisAgent, OrbisSnapshot
-import urllib.parse
-
-class PatientAgent(OrbisAgent):
-    def goto(self, url: str, timeout: float = 45) -> OrbisSnapshot:
-        req = urllib.request.Request(
-            f"{self.base_url}/orbis/goto?{urllib.parse.urlencode({'url': url})}",
-            headers=self._make_headers(),
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            data = json.loads(res.read().decode("utf-8"))
-        return OrbisSnapshot(data.get("snapshot", data))
+agent = OrbisAgent.connect("http://localhost:9222", timeout=90)
+# or
+agent = OrbisAgent("http://localhost:9222", timeout=90)
 ```
+
+The daemon's own navigation timeout is 20 s (change it with `--http-timeout`), plus up to 5 s of settle time for page scripts. With the 60 s default, the daemon reports a slow page as a navigation error (HTTP 500) before the client gives up. If you lower `timeout` below the daemon's navigation time, a client timeout can fire while the daemon is still loading; the daemon finishes the navigation anyway, and a later `snapshot()` returns the loaded page.
 
 ## Concurrency, threads and asyncio
 
@@ -500,7 +484,7 @@ def lease():
     try:
         yield agent
     finally:
-        agent.goto("data:text/html,<title>idle</title>")  # drop the previous document (about:blank is not supported; cookies remain)
+        agent.goto("about:blank")  # drop the previous document (cookies remain)
         _pool.put(agent)
 
 with lease() as agent:
@@ -576,10 +560,10 @@ res = agent.fill_form(
 assert not res["skipped"], res["skipped"]
 assert "/login" not in res["url"], "login did not navigate away"
 
-agent.save_session("/var/lib/orbis/sessions/app.json")   # path on the daemon host
+agent.save_session("app.json")   # on the daemon host, inside its session folder
 
 # later, possibly after a daemon restart:
-agent.load_session("/var/lib/orbis/sessions/app.json")
+agent.load_session("app.json")
 snap = agent.goto("https://app.example.com/dashboard")
 ```
 
@@ -638,26 +622,16 @@ res = agent.fill_form({"label:Full name": "Priya Sharma"}, submit="text=Continue
 ## Production checklist
 
 - [ ] One daemon per concurrent agent or worker. Never share a daemon between parallel jobs.
-- [ ] Bind the daemon to a private network only, and put it behind a firewall or an authenticating reverse proxy. The API key is not enforced in 0.1.0 (see [security.md](./security.md)).
-- [ ] Handle `goto()` client timeouts (15 s) separately from navigation failures (HTTP 500).
+- [ ] Keep the daemon on loopback or a private network. If other hosts can reach it, start it with `ORBIS_API_KEY` and pass the same key to `OrbisAgent` (see [security.md](./security.md)).
+- [ ] Handle client timeouts separately from navigation failures (HTTP 500).
 - [ ] Check `fill_form(...)["skipped"]` and `act(...)["success"]`. Neither raises on a missing element.
-- [ ] Remember that `act()` clicks do not follow links or submit forms.
-- [ ] Do not use `select_option()`. Use `act(target, value)`.
-- [ ] Store session files as secrets, and remember the paths are on the daemon host.
-- [ ] Do not take `@N` IDs from focused snapshots into `act()`.
-- [ ] Re-snapshot before acting if page scripts may have changed the DOM. `@N` numbering is recomputed at action time.
-- [ ] Pin both versions: `memora-orbis==0.1.0` in Python and `@memoracompany/memora-orbis@0.1.0` for the daemon.
+- [ ] Pass `submit=True` (or a button locator) to `fill_form()` when the form should be submitted. The default only fills.
+- [ ] Store session files as secrets, and remember the paths are on the daemon host, inside its session folder.
+- [ ] Re-snapshot before acting if page scripts may have changed the DOM.
+- [ ] Pin both versions: `memora-orbis==0.2.0` in Python and `@memoracompany/memora-orbis@0.2.0` for the daemon.
 
 ## Known issues
 
-> **Known issue (0.1.0):** `select_option()` always fails with HTTP 404 because `/orbis/select-option` is not implemented. Use `act(target, value)`.
-
-> **Known issue (0.1.0):** `act()` click does not perform default actions (link navigation, form submission).
-
-> **Known issue (0.1.0):** The API key is sent but not validated by the daemon.
-
-> **Known issue (0.1.0):** `fill_form(submit=...)` is annotated as `bool` but the daemon also accepts a locator string. Type checkers will flag string values.
-
-> **Known issue (0.1.0):** The PyPI package metadata lists an MIT License classifier. The actual license is the Orbis Community & Commercial Evaluation License in [LICENSE.md](../LICENSE.md).
+There are no Python-specific known issues in 0.2.0. The package is licensed under the Orbis Community & Commercial Evaluation License in [LICENSE.md](../LICENSE.md); its PyPI metadata uses the `License :: Other/Proprietary License` classifier.
 
 See also: [http-api.md](./http-api.md), [locators.md](./locators.md), [integrations.md](./integrations.md), [troubleshooting.md](./troubleshooting.md), [limitations.md](./limitations.md).

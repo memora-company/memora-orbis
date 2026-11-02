@@ -2,7 +2,7 @@
 
 This page shows how to connect Orbis to agent frameworks and LLM APIs: LangChain (TypeScript and Python), Browser-Use, Stagehand, CrewAI, AutoGen, OpenAI-style function calling, and a complete Claude tool-use loop. For each one it states which Orbis surface it uses (the TypeScript SDK, the Python SDK over HTTP, CDP or MCP) and what was verified for 0.1.0. Integrations that depend on a full Chrome (screenshots, accessibility trees, layout) carry clear warnings.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -57,9 +57,9 @@ interface LangChainToolLike {
 | :--- | :--- | :--- |
 | `orbis_navigate` | `{ url }` or a URL string | Title, URL, action map and the first 4,000 characters of Markdown. |
 | `orbis_snapshot` | `{ focusSelector?, excludeSelectors? }` | Action map plus the first 4,000 characters of Markdown. |
-| `orbis_act` | `{ actionId, text? }` or a locator string | `succeeded`/`failed` plus the diff summary. Click dispatches the event only, so it does **not** follow links or submit forms. |
+| `orbis_act` | `{ actionId, text? }` or a locator string | `succeeded`/`failed` plus the diff summary. A click works like a real click: it follows links and submits forms. |
 | `orbis_diff` | `{}` | Added, removed and changed counts, plus the summary. |
-| `orbis_fill_form` | `{ fields, submit? }` | `submit` defaults to `true`. Returns the count, URL and new action map. |
+| `orbis_fill_form` | `{ fields, submit? }` | `submit` defaults to `false` (fill only); pass `true` or a submit button locator to submit. Returns the count, URL and new action map. |
 
 The built-in tools return the full `actionMapText`, which includes a CSS selector per element and is not truncated. On large, link-dense pages that output can exceed the page's raw HTML in size. For production agents, write your own navigate/snapshot tool that formats `snap.actions` without selectors and caps the count (see `compact_actions` in the [Claude example](#anthropic-claude-tool-use)). Pass `focusSelector: 'main'` and `excludeSelectors: ['nav', 'footer']` where the page structure allows.
 
@@ -117,7 +117,7 @@ export const tools = [
 
 `OrbisAgent.launch()` also starts a CDP server on `cdpPort` (default 9222). Pick a free port per process when you run several agents.
 
-**Following links.** Because `orbis_act` clicks do not navigate, add a navigation path: either tell the model to call `orbis_navigate` with the link's `href` from the action map, or add your own tool that calls `agent.page.activate(target)`:
+**Following links.** `orbis_act` clicks follow links and submit forms, so the model can navigate by clicking. If you want a tool that reports whether a click navigated, call `agent.page.activate(target)`:
 
 ```typescript
 new DynamicStructuredTool({
@@ -144,7 +144,7 @@ tools = agent.to_langchain_tools()        # [orbis_navigate, orbis_act, orbis_di
 ```
 
 - Requires `pip install langchain`. The tools are built with `langchain.tools.tool`, so they carry schemas derived from the function signatures.
-- Only three tools. There is no form-filling tool, and `orbis_act` clicks do not navigate. Add your own tools with `@tool` around `agent.fill_form(...)` and `agent.goto(...)` as needed.
+- Only three tools. There is no form-filling tool (`orbis_act` clicks do follow links and submit forms). Add your own tools with `@tool` around `agent.fill_form(...)` and `agent.goto(...)` as needed.
 - Every tool call shares the daemon's single page. Use one daemon per concurrent agent ([python-sdk.md](./python-sdk.md#concurrency-threads-and-asyncio)).
 
 ```python
@@ -302,7 +302,7 @@ Notes for production:
 - All `tool_result` blocks for one assistant turn go back in a **single** user message, and failures are returned with `is_error: True` instead of being dropped.
 - The Orbis Python SDK talks to one shared page. Tool calls inside one turn run sequentially here, which is required. Do not parallelize them against the same daemon.
 - Bound what you send back. The raw `action_map_text` repeats a CSS selector on every line, often a long `nth-of-type` path. On link-dense pages a full snapshot can be **larger than the page's raw HTML** (measured on Hacker News: about 17,800 estimated tokens for the snapshot versus about 8,700 for the HTML). The `compact_actions` helper drops selectors and caps the list. Also trim with `browser.snapshot(focus_selector=..., exclude_selectors=[...])`, and send `diff()` summaries after in-page actions instead of whole snapshots ([best-practices.md](./best-practices.md)).
-- Typed values (including passwords) appear in later action maps as `value="..."`. Never let the model type real secrets. Load a saved session instead ([sessions-and-auth.md](./sessions-and-auth.md)).
+- Typed values are hidden in later action maps (`[FILLED]`) and diffs, and password values are never included. Still, avoid letting the model type real secrets: load a saved session instead ([sessions-and-auth.md](./sessions-and-auth.md)).
 - `claude-opus-5-5` is the default model. `claude-sonnet-5-5` is a lower-cost alternative for high-volume browsing loops.
 - For Claude Opus 5.5 and Sonnet 5.5, the Anthropic API offers server-side refusal fallbacks (`fallbacks`, a beta parameter). See Anthropic's documentation on refusals and fallbacks if you need automatic rerouting rather than the simple stop shown above.
 - The same loop works in TypeScript with `@anthropic-ai/sdk` (`client.messages.create`) and the in-process `OrbisAgent`, which avoids the daemon entirely.
@@ -359,7 +359,7 @@ def orbis_browse(url: str) -> str:
     return f"{snap.action_map_text}\n\n{snap.markdown[:6000]}"
 
 def orbis_act(target: str, text: str = "") -> str:
-    """Click (empty text) or type into an element. Clicks do not follow links: use orbis_browse with the href."""
+    """Click (empty text) or type into an element. Clicks follow links and submit forms."""
     res = browser.act(target, text or None)
     return browser.diff()["diff"]["summary"] if res["success"] else f"No element matches {target}"
 
@@ -389,7 +389,7 @@ OrbisAgent("http://localhost:9222").to_browser_use()
 
 Pass `cdp_url` to whichever Browser-Use class accepts a CDP URL in your Browser-Use version (the constructor names have changed across releases). `extraChromiumArgs` and `disableSecurity` are for launching Chrome and have no effect on Orbis.
 
-> **Warning: Browser-Use on Orbis is not verified for 0.1.0, and is unlikely to work for most tasks.** Browser-Use builds its view of the page from screenshots (vision mode), element bounding boxes, computed styles and visibility, all of which need a rendering engine. On Orbis, screenshots are a blank 1Ã—1 PNG, layout boxes are synthetic, `getComputedStyle` and `IntersectionObserver` are not available in the page runtime, and iframes are not loaded ([playwright-puppeteer.md](./playwright-puppeteer.md#compatibility-matrix)). Vision mode will not work at all.
+> **Warning: Browser-Use on Orbis is not verified for 0.1.0, and is unlikely to work for most tasks.** Browser-Use builds its view of the page from screenshots (vision mode), element bounding boxes, computed styles and visibility, all of which need a rendering engine. On Orbis, screenshots are a blank 1×1 PNG, layout boxes are synthetic, `getComputedStyle` only reports inline styles plus defaults, `IntersectionObserver` is a stub, and iframes are not loaded ([playwright-puppeteer.md](./playwright-puppeteer.md#compatibility-matrix)). Vision mode will not work at all.
 >
 > Recommended alternative: keep your Browser-Use-style agent loop but replace the browser layer with Orbis's own tools, either the Python SDK functions above or the MCP server. The action map gives the model the same kind of numbered element list Browser-Use builds from Chrome, without needing rendering.
 
@@ -405,7 +405,7 @@ const config = getStagehandConfig(agent);
 
 Map `localBrowserUrl` to the CDP URL option of your Stagehand version (for example `localBrowserLaunchOptions: { cdpUrl }` in Stagehand v2). The helper's shape does not track Stagehand's API.
 
-> **Warning: Stagehand on Orbis is not verified for 0.1.0.** Stagehand's `observe`/`act`/`extract` rely on Chrome's accessibility tree and on Playwright features that Orbis does not implement (the CDP `Accessibility` domain returns nothing, `newCDPSession` crashes the Playwright client in 0.1.0, and layout is synthetic). Expect failures. For LLM-driven actions on Orbis, use the built-in action map (`agent.snapshot()`, `agent.act()`), which covers the same need natively.
+> **Warning: Stagehand on Orbis is not verified for 0.1.0.** Stagehand's `observe`/`act`/`extract` rely on Chrome's accessibility tree and on Playwright features that Orbis does not implement (the CDP `Accessibility` domain returns nothing, and layout is synthetic). Expect failures. For LLM-driven actions on Orbis, use the built-in action map (`agent.snapshot()`, `agent.act()`), which covers the same need natively.
 
 ## MCP-capable frameworks
 
@@ -421,11 +421,11 @@ You get 15 tools with descriptions and schemas, link-following clicks (`memora_a
 
 ## Design guidance for agent tools
 
-- **Navigate with URLs, act with locators.** Give the model a navigation tool that takes a URL and tell it to use `href` values from the action map. That avoids the "click did not navigate" trap in the SDK `act()` methods.
+- **Navigate with URLs or clicks.** Give the model a navigation tool that takes a URL; clicks through `act()` also follow links and submit forms.
 - **Prefer stable locators in deterministic flows.** `@N` IDs are recomputed on every resolution. For scripted steps, use `label:`, `testid:` or CSS ([locators.md](./locators.md)).
 - **Return diffs, not full pages, after in-page actions.** That keeps context small over long sessions.
 - **Bound every tool output.** Truncate Markdown, focus snapshots on `main`, exclude navigation and footers.
 - **Treat page text as untrusted.** Put an instruction in the system prompt and never give browsing agents tools with side effects outside the browser without human approval ([security.md](./security.md)).
-- **Isolate agents.** One page (TypeScript) or one daemon (Python and REST) per concurrent agent. Never visit untrusted sites in a page that holds an authenticated session, because native-engine cookies are not domain-scoped.
+- **Isolate agents.** One page (TypeScript) or one daemon (Python and REST) per concurrent agent. Cookies are scoped by site, but keep authenticated sessions in their own page or context anyway, so an agent's browsing of other sites can't act on that login.
 
 See also: [use-cases.md](./use-cases.md), [best-practices.md](./best-practices.md), [typescript-sdk.md](./typescript-sdk.md), [python-sdk.md](./python-sdk.md).

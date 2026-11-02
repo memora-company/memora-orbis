@@ -10,7 +10,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@memoracompany/memora-orbis.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@memoracompany/memora-orbis)
 [![PyPI](https://img.shields.io/pypi/v/memora-orbis.svg?style=flat-square&color=brightgreen)](https://pypi.org/project/memora-orbis/)
-[![Changelog](https://img.shields.io/badge/Changelog-v0.1.2-blue.svg?style=flat-square)](./CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/Changelog-v0.2.0-blue.svg?style=flat-square)](./CHANGELOG.md)
 [![License: Evaluation & Commercial](https://img.shields.io/badge/License-Community%20Evaluation-orange.svg?style=flat-square)](./LICENSE.md)
 [![CDP](https://img.shields.io/badge/CDP-Supported-blueviolet.svg?style=flat-square)](./docs/playwright-puppeteer.md)
 [![WebDriver](https://img.shields.io/badge/WebDriver-Supported-orange.svg?style=flat-square)](./docs/selenium-webdriver.md)
@@ -18,12 +18,12 @@
 
 <br/>
 
-<a href="./docs/README.md"><b>Documentation</b></a> Ã¢â‚¬Â¢
-<a href="./docs/getting-started.md"><b>Getting started</b></a> Ã¢â‚¬Â¢
-<a href="./CHANGELOG.md"><b>Changelog</b></a> Ã¢â‚¬Â¢
-<a href="./docs/use-cases.md"><b>Use cases</b></a> Ã¢â‚¬Â¢
-<a href="./docs/production-deployment.md"><b>Production</b></a> Ã¢â‚¬Â¢
-<a href="./examples/"><b>Examples</b></a> Ã¢â‚¬Â¢
+<a href="./docs/README.md"><b>Documentation</b></a> •
+<a href="./docs/getting-started.md"><b>Getting started</b></a> •
+<a href="./CHANGELOG.md"><b>Changelog</b></a> •
+<a href="./docs/use-cases.md"><b>Use cases</b></a> •
+<a href="./docs/production-deployment.md"><b>Production</b></a> •
+<a href="./examples/"><b>Examples</b></a> •
 <a href="https://orbis.memora.company"><b>Website</b></a>
 
 </div>
@@ -70,7 +70,7 @@ Measured by the Orbis team on one Windows 11 laptop (Node.js 22), October 2026. 
 | Time to load 200 local test pages in one tab (median of 3, after start-up) | 3.4 s | **0.31 s** |
 | Memory with 10 tabs open | 1,154 MB | **107 MB** |
 
-On the four HTML fixtures in the Orbis benchmark, the distilled output used 33Ã¢â‚¬â€œ40% fewer tokens than the raw HTML (37% on average), and parsing plus building the action map and Markdown took about 4 ms per page.
+On the four HTML fixtures in the Orbis benchmark, the distilled output used 33–40% fewer tokens than the raw HTML (37% on average), and parsing plus building the action map and Markdown took about 4 ms per page.
 
 Token savings are not automatic on real sites. Each action line includes a CSS selector, and on link-dense pages those selectors can make the full snapshot larger than the HTML (for example, about 17,800 estimated tokens for the Hacker News front page, which is about 35 KB of HTML). Use `focusSelector`, `excludeSelectors`, or a compact map built from `snapshot.actions`, as described in [Best practices](./docs/best-practices.md).
 
@@ -277,21 +277,21 @@ Orbis servers are built for trusted networks. Read [Security](./docs/security.md
 | [Concepts](./docs/concepts.md) | Page lifecycle, action map, action IDs, diffs, forks, sessions, engines |
 | [Use cases](./docs/use-cases.md) | Complete, real-world recipes |
 | [Best practices](./docs/best-practices.md) | Reliable agent loops, waiting, retries, concurrency |
-| [CLI](./docs/cli-reference.md) Ã‚Â· [TypeScript SDK](./docs/typescript-sdk.md) Ã‚Â· [Python SDK](./docs/python-sdk.md) Ã‚Â· [HTTP API](./docs/http-api.md) Ã‚Â· [Locators](./docs/locators.md) | Reference |
-| [MCP](./docs/mcp.md) Ã‚Â· [Playwright/Puppeteer](./docs/playwright-puppeteer.md) Ã‚Â· [Selenium](./docs/selenium-webdriver.md) Ã‚Â· [Agent frameworks](./docs/integrations.md) | Integrations |
-| [Production](./docs/production-deployment.md) Ã‚Â· [Security](./docs/security.md) Ã‚Â· [Network](./docs/network-and-proxies.md) Ã‚Â· [Stealth](./docs/stealth.md) Ã‚Â· [Sessions](./docs/sessions-and-auth.md) | Operations |
-| [Troubleshooting](./docs/troubleshooting.md) Ã‚Â· [Limitations](./docs/limitations.md) | When things go wrong |
+| [CLI](./docs/cli-reference.md) · [TypeScript SDK](./docs/typescript-sdk.md) · [Python SDK](./docs/python-sdk.md) · [HTTP API](./docs/http-api.md) · [Locators](./docs/locators.md) | Reference |
+| [MCP](./docs/mcp.md) · [Playwright/Puppeteer](./docs/playwright-puppeteer.md) · [Selenium](./docs/selenium-webdriver.md) · [Agent frameworks](./docs/integrations.md) | Integrations |
+| [Production](./docs/production-deployment.md) · [Security](./docs/security.md) · [Network](./docs/network-and-proxies.md) · [Stealth](./docs/stealth.md) · [Sessions](./docs/sessions-and-auth.md) | Operations |
+| [Troubleshooting](./docs/troubleshooting.md) · [Limitations](./docs/limitations.md) | When things go wrong |
 
 ## Examples
 
 Runnable projects in [`examples/`](./examples/):
 
-- [`01-autonomous-agent`](./examples/01-autonomous-agent/) Ã¢â‚¬â€ snapshot, act, diff, fork and sessions with the TypeScript SDK
-- [`02-playwright-cdp`](./examples/02-playwright-cdp/) Ã¢â‚¬â€ an existing Playwright script connected over CDP
-- [`03-selenium-webdriver`](./examples/03-selenium-webdriver/) Ã¢â‚¬â€ Selenium in Python and TypeScript with no chromedriver
-- [`04-dynamic-dropdown-wizard`](./examples/04-dynamic-dropdown-wizard/) Ã¢â‚¬â€ dependent dropdowns (country to state) with stable locators and diffs
-- [`05-browser-use-ai`](./examples/05-browser-use-ai/) Ã¢â‚¬â€ Browser-Use over CDP (experimental)
-- [`06-mcp-server`](./examples/06-mcp-server/) Ã¢â‚¬â€ MCP configs and a raw JSON-RPC client
+- [`01-autonomous-agent`](./examples/01-autonomous-agent/) — snapshot, act, diff, fork and sessions with the TypeScript SDK
+- [`02-playwright-cdp`](./examples/02-playwright-cdp/) — an existing Playwright script connected over CDP
+- [`03-selenium-webdriver`](./examples/03-selenium-webdriver/) — Selenium in Python and TypeScript with no chromedriver
+- [`04-dynamic-dropdown-wizard`](./examples/04-dynamic-dropdown-wizard/) — dependent dropdowns (country to state) with stable locators and diffs
+- [`05-browser-use-ai`](./examples/05-browser-use-ai/) — Browser-Use over CDP (experimental)
+- [`06-mcp-server`](./examples/06-mcp-server/) — MCP configs and a raw JSON-RPC client
 
 ---
 
@@ -303,10 +303,10 @@ Contributions are welcome. Read the [Contributing guide](./CONTRIBUTING.md) and 
 
 **[Memora](https://memora.company/)** is an AI organizational memory and knowledge management platform that stops teams from losing what they know. It connects Slack, GitHub, Jira, Confluence, Linear, Notion, Google Drive and meeting transcripts into one searchable, cited memory:
 
-- **[Organizational Memory](https://memora.company/solutions/organizational-memory)** Ã¢â‚¬â€ captures the reasoning behind decisions as they happen.
-- **[Enterprise Knowledge Search](https://memora.company/solutions/enterprise-knowledge-search)** Ã¢â‚¬â€ one natural-language search across your tools, with citations.
-- **[AI Meeting Notes](https://memora.company/solutions/ai-meeting-notes)** Ã¢â‚¬â€ links meeting decisions and action items to the code and tickets they affect.
-- **[Orbis](https://orbis.memora.company)** Ã¢â‚¬â€ the lightweight, agent-first headless browser in this repository.
+- **[Organizational Memory](https://memora.company/solutions/organizational-memory)** — captures the reasoning behind decisions as they happen.
+- **[Enterprise Knowledge Search](https://memora.company/solutions/enterprise-knowledge-search)** — one natural-language search across your tools, with citations.
+- **[AI Meeting Notes](https://memora.company/solutions/ai-meeting-notes)** — links meeting decisions and action items to the code and tickets they affect.
+- **[Orbis](https://orbis.memora.company)** — the lightweight, agent-first headless browser in this repository.
 
 ## License
 

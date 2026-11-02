@@ -2,7 +2,7 @@
 
 This page explains how Orbis makes HTTP requests and how to control them: request headers, the user agent, timeouts, TLS, redirects, proxies (HTTP, HTTPS and SOCKS), `NO_PROXY` rules, robots.txt compliance (RFC 9309) and cookie handling. All options are available as CLI flags and as the `network` option of the TypeScript SDK.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -30,8 +30,8 @@ In the native engine (used by the SDKs, the CDP daemon, the WebDriver daemon, `f
 | Top-level navigation (`goto`, link click via `activate`, form submit) | `NetworkFetcher.request()` | Yes |
 | `<script src>` and module imports | `NetworkFetcher.fetchResource()` | Yes, with resource-style headers (`Accept: */*`, `Referer`) |
 | Page `fetch()` | `NetworkFetcher.pageFetch()` | Yes (proxy, cookies, extra headers, robots). Redirects are followed automatically. |
-| `XMLHttpRequest` | Not available in the native engine (see [limitations.md](./limitations.md)) | â€” |
-| Images, CSS, fonts, media | **Not requested**. The native engine does not render. | â€” |
+| `XMLHttpRequest` (async only) | Built on page `fetch()` | Yes, same as page `fetch()` |
+| Images, CSS, fonts, media | **Not requested**. The native engine does not render. | — |
 
 Because stylesheets and images are never downloaded, a page load makes far fewer requests than a real browser. Some bot-detection systems notice this (see [stealth.md](./stealth.md)).
 
@@ -41,18 +41,18 @@ All server commands (`orbis`, `orbis serve`) and `orbis fetch` accept the same n
 
 | `NetworkOptions` field | CLI flag | Type / default | Description |
 | :--- | :--- | :--- | :--- |
-| `proxy` | *(none that works in 0.1.0; see [section 7](#7-proxies))* | `string` | Proxy URL: `http://`, `https://`, `socks5://`, `socks5h://`, `socks://`. Credentials allowed as `user:pass@host`. |
+| `proxy` | `--http-proxy <url>` | `string` | Proxy URL: `http://`, `https://`, `socks5://`, `socks5h://`, `socks://`. Credentials allowed as `user:pass@host`. |
 | `proxyBearerToken` | `--proxy-bearer-token <token>` | `string` | Sent as `Proxy-Authorization: Bearer <token>`. HTTP(S) proxies only. |
 | `noProxy` | `--proxy-bypass <hosts>` | `string[]` (CLI: comma-separated) | Hosts that skip the proxy |
 | `useEnvProxy` | `--use-env-proxy` | `boolean`, `false` | Use `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` when no explicit proxy is set |
 | `headers` | `--http-header "Name: Value"` (repeatable) | `Record<string,string>` | Extra headers on every request |
-| `userAgent` | `--user-agent <ua>` | `string` | Overrides the `User-Agent` header (also `BrowserOptions.userAgent`) |
-| `timeoutMs` | `--http-timeout <ms>` | `number`, fetcher default 15 000 | See [Timeouts](#4-timeouts) and the known issue there |
+| `userAgent` | `--user-agent <ua>` | `string` | Overrides the `User-Agent` header and `navigator.userAgent` (also `BrowserOptions.userAgent`) |
+| `timeoutMs` | `--http-timeout <ms>` | `number` | Default navigation timeout. See [Timeouts](#4-timeouts) |
 | `insecureTls` | `--insecure-disable-tls-host-verification` | `boolean`, `false` | Skip TLS certificate verification |
 | `obeyRobots` | `--obey-robots` | `boolean`, `false` | Enforce robots.txt on every request |
 | `robotsAgent` | `--robots-agent <token>` | `string`, `MemoraBrowser` | Product token matched against robots.txt `User-agent` lines |
-| `onChallenge` | `--on-challenge <mode>` | `'report' \| 'stop'`, `'report'` | Unreleased. On a blocking CAPTCHA/bot challenge or 429: load and flag it, or throw `ChallengeDetectedError`. See [challenges.md](./challenges.md) |
-| `challengeCooldownSec` | `--challenge-cooldown <sec>` | `number`, `60` | Unreleased. Pause requests to a host after a blocking challenge or 429; `Retry-After` wins; `0` disables |
+| `onChallenge` | `--on-challenge <mode>` | `'report' \| 'stop'`, `'report'` | Added in 0.1.2. On a blocking CAPTCHA/bot challenge or 429: load and flag it, or throw `ChallengeDetectedError`. See [challenges.md](./challenges.md) |
+| `challengeCooldownSec` | `--challenge-cooldown <sec>` | `number`, `60` | Added in 0.1.2. Pause requests to a host after a blocking challenge or 429; `Retry-After` wins; `0` disables |
 
 TypeScript example:
 
@@ -98,7 +98,7 @@ Script and page-`fetch()` requests send only `User-Agent` and `Accept: */*` (plu
 **Precedence**, from lowest to highest priority:
 
 1. the default header set,
-2. `--user-agent` / `network.userAgent`,
+2. `--user-agent` / `network.userAgent` (also sets `navigator.userAgent`; the `Sec-Ch-Ua*` client-hint headers are dropped when the value is not a Chrome User-Agent),
 3. headers set by CDP clients (`Network.setExtraHTTPHeaders`, for example Playwright `setExtraHTTPHeaders`),
 4. `--http-header` / `network.headers` (CLI headers win over script-set headers),
 5. per-request headers (`page.goto(url, { headers })`, form-submission headers, page `fetch()` `init.headers`).
@@ -111,15 +111,15 @@ The `Cookie` header is built from the page's cookie jar on every request.
 
 | What | Default | Control |
 | :--- | :--- | :--- |
-| Navigation request (all redirect hops) | 20 000 ms | `page.goto(url, { timeoutMs })` or `page.goto(url, 10_000)`; MCP `memora_browse` `timeout` |
+| Navigation request (all redirect hops) | 20 000 ms | `--http-timeout <ms>` / `network.timeoutMs` for all navigations; per call `page.goto(url, { timeoutMs })` or `page.goto(url, 10_000)` (wins over the default); MCP `memora_browse` `timeout` |
 | Script downloads during a load | The remaining navigation budget | Same as navigation |
 | Post-load settle | 5 000 ms (capped by the navigation budget) | `page.settleTimeoutMs`, `page.goto(url, { settleTimeoutMs })` |
-| Page `fetch()` | No Orbis timeout. Pages use their own `AbortController`. | â€” |
+| Page `fetch()` | No Orbis timeout. Pages use their own `AbortController`. | — |
 | robots.txt download | 10 000 ms | Not configurable |
 
 A timed-out navigation throws `Navigation timeout after <ms>ms: <url>`.
 
-> **Known issue (0.1.0):** `--http-timeout` / `network.timeoutMs` has no effect on navigations, because `page.goto()` always supplies its own timeout (20 000 ms by default). Verified: `orbis fetch <url> --http-timeout 200` still loaded a page that took 1.5 s. Set timeouts per call with `page.goto(url, { timeoutMs })`. `OrbisAgent.goto()` does not take a timeout, so use `agent.page.goto(url, { timeoutMs })` and then `agent.snapshot()`.
+> **Changed in 0.2.0:** `--http-timeout` / `network.timeoutMs` now limits navigations unless a call passes its own timeout. In earlier versions it had no effect on navigations.
 
 ## 5. TLS
 
@@ -142,9 +142,19 @@ JavaScript navigations (`location.href = ...` during load) are followed up to 5 
 
 ## 7. Proxies
 
-> **Known issue (0.1.0):** `--http-proxy <url>` is a placeholder for the upcoming Orbis Cloud managed proxy network. In 0.1.0 it prints an "Orbis Cloud (Coming Soon)" notice and **does not configure a proxy**. Requests go out directly. Use one of the two working methods below.
+There are three ways to set a proxy: `--http-proxy`, environment variables, or `network.proxy` in TypeScript.
 
-### Method 1: environment variables (CLI, daemon, MCP)
+> **Changed in 0.2.0:** `--http-proxy <url>` now routes traffic through the proxy. In earlier versions it only printed an Orbis Cloud notice. The notice may still be printed; you can ignore it.
+
+### Method 1: `--http-proxy` (CLI, daemon, MCP)
+
+```bash
+orbis --port 9222 --http-proxy http://user:pass@proxy.internal:3128
+```
+
+`http://` sites are sent to the proxy as plain forward-proxy requests; `https://` sites are tunnelled with `CONNECT`.
+
+### Method 2: environment variables (CLI, daemon, MCP)
 
 ```bash
 export HTTPS_PROXY="http://user:pass@proxy.internal:3128"
@@ -183,7 +193,7 @@ MCP configuration example:
 }
 ```
 
-### Method 2: `network.proxy` in TypeScript
+### Method 3: `network.proxy` in TypeScript
 
 ```ts
 import { OrbisAgent } from '@memoracompany/memora-orbis';
@@ -210,7 +220,7 @@ Percent-encode special characters in credentials, for example `p%40ss` for `p@ss
 
 | Message | Meaning |
 | :--- | :--- |
-| `Request to <url> failed: ... (407) â€” proxy rejected the credentials (check user:pass in --http-proxy or --proxy-bearer-token)` | Wrong or missing proxy credentials. The hint mentions `--http-proxy`, but in 0.1.0 put credentials in the proxy environment variable or `network.proxy`. |
+| `Request to <url> failed: ... (407) — proxy rejected the credentials (check user:pass in --http-proxy or --proxy-bearer-token)` | Wrong or missing proxy credentials. Check the credentials in `--http-proxy`, the proxy environment variable or `network.proxy`. |
 | `Request to <url> failed: connect ECONNREFUSED ...` | The proxy is unreachable |
 | `Navigation timeout after 20000ms: <url>` | The proxy or target is too slow. Raise `timeoutMs` per call. |
 
@@ -254,6 +264,7 @@ Behaviour (RFC 9309):
 | `4xx` (including 404) | Everything allowed |
 | `5xx` or network error/timeout | **Everything disallowed** for that origin, cached for 24 hours |
 | Agent matching | Groups whose `User-agent` equals the product token (case-insensitive) are used. Otherwise the `*` groups. Matching groups are combined. |
+| `Crawl-delay` | Honoured between requests to the same site, capped at 60 seconds |
 | Rule precedence | Longest matching path pattern wins; on a tie, `Allow` wins. `*` and `$` wildcards are supported, and paths are percent-encoding-normalised. |
 | `/robots.txt` itself | Always allowed |
 | Token format | `--robots-agent` must contain only letters, `_` and `-`, otherwise the CLI exits with `Invalid --robots-agent ... (RFC 9309)` |
@@ -282,12 +293,11 @@ Native engine behaviour:
 
 - Each page has its own cookie jar. Pages created by the same `OrbisBrowser` do **not** share cookies. A forked page starts with a copy.
 - `Set-Cookie` is processed on navigations, on every redirect hop, and on the final response of page `fetch()`.
-- The jar is a flat `name â†’ value` map. **Domain, Path, Secure, HttpOnly, SameSite and expiry are ignored.** A cookie is removed only by `Max-Age=0` or an `Expires` date before 1980.
-- Every cookie is sent to every host, including subresources and redirect targets.
+- Cookies are scoped like in a browser: by domain (host-only, or the host and its subdomains when `Domain=` is set), path, `Secure` and expiry. A cookie from one site is not sent to other sites.
 - `document.cookie` is not available to page scripts in the native SDK engine.
-- Manage cookies with `page.fetcher.setCookie(name, value)`, `deleteCookie(name)`, `clearCookies()` and `dumpCookies()`, with WebDriver `add_cookie`/`get_cookies`/`delete_cookie`, CDP `Network.getCookies`, or MCP `memora_cookies`.
+- Manage cookies with `page.fetcher.setCookie(name, value, url?)`, `deleteCookie(name, url?)`, `clearCookies()` and `dumpCookies(url?)`, with WebDriver `add_cookie`/`get_cookies`/`delete_cookie`, CDP `Network.getCookies`, or MCP `memora_cookies`. When you leave out `url`, the current page's site is used.
 
-> **Known issue (0.1.0):** because cookies are not scoped, a session cookie from one site is sent to every other site the page visits (verified). See [security.md](./security.md#25-cookies-are-not-scoped-to-a-site) and [sessions-and-auth.md](./sessions-and-auth.md).
+See [sessions-and-auth.md](./sessions-and-auth.md) for saving and restoring cookies.
 
 ## 11. Chrome engine differences
 
@@ -341,7 +351,7 @@ for (const url of urls) {
   } catch (e: any) {
     if (e?.code !== 'ERR_BLOCKED_BY_ROBOTS') console.error(url, e.message);
   }
-  await new Promise(r => setTimeout(r, 1000)); // rate limit
+  await new Promise(r => setTimeout(r, 1000)); // rate limit (Crawl-delay from robots.txt is also honoured)
 }
 browser.close();
 ```

@@ -1,8 +1,8 @@
 # MCP Server Guide
 
-Orbis includes a Model Context Protocol (MCP) server that gives AI assistants (Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code, or any MCP client) a token-efficient web browser. The server speaks JSON-RPC 2.0 over stdio and exposes 15 tools. Each one loads a page, acts on it, or reads from it, and returns compact text: an action map plus Markdown instead of raw HTML. This page covers client setup, engine selection, every tool's inputs and outputs, and the security implications of handing these tools to a model.
+Orbis includes a Model Context Protocol (MCP) server that gives AI assistants (Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code, or any MCP client) a token-efficient web browser. The server speaks JSON-RPC 2.0 over stdio and exposes 17 tools. Each one loads a page, acts on it, or reads from it, and returns compact text: an action map plus Markdown instead of raw HTML. This page covers client setup, engine selection, every tool's inputs and outputs, and the security implications of handing these tools to a model.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -32,11 +32,11 @@ npx -y @memoracompany/memora-orbis --mcp
 - For faster start-up and pinned versions, install once and point the client at the binary:
 
 ```bash
-npm install -g @memoracompany/memora-orbis@0.1.0
+npm install -g @memoracompany/memora-orbis@0.2.0
 orbis --mcp        # what the client will run
 ```
 
-**Recommended environment variable:** set `ORBIS_NO_TELEMETRY=1` in the server's environment. On start-up the CLI calls `https://orbis.memora.company/api/v1/version-check`. If a newer version exists, it prints an "UPDATE AVAILABLE" line to **stdout**, which can corrupt the MCP JSON-RPC stream (see [Known issues](#known-issues)). The variable disables the check entirely.
+**Recommended environment variable:** set `ORBIS_NO_TELEMETRY=1` in the server's environment. On start-up the CLI calls `https://orbis.memora.company/api/v1/version-check`. If a newer version exists, it prints an "UPDATE AVAILABLE" line to stderr, so it does not interfere with the MCP JSON-RPC stream on stdout. The variable disables the check entirely, which is useful in air-gapped or CI environments.
 
 ## Client configuration
 
@@ -82,7 +82,7 @@ claude mcp list
 
 ### Cursor
 
-Settings Ã¢â€ â€™ MCP Ã¢â€ â€™ Add new MCP server, or edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+Settings → MCP → Add new MCP server, or edit `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
 
 ```json
 {
@@ -114,7 +114,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ### Google Antigravity
 
-Open the MCP server settings (Agent panel Ã¢â€ â€™ MCP Servers Ã¢â€ â€™ Manage Ã¢â€ â€™ View raw config) and add the same `mcpServers.orbis` block as above.
+Open the MCP server settings (Agent panel → MCP Servers → Manage → View raw config) and add the same `mcpServers.orbis` block as above.
 
 ### VS Code (GitHub Copilot agent mode)
 
@@ -159,7 +159,7 @@ Paths checked by `auto` and `chrome`, in order:
 
 Which engine to use:
 
-- **Client-rendered apps** (React, Vue, Angular or Svelte SPAs, including your local dev server at `http://localhost:3000`): use `--engine chrome`. The native engine's page runtime does not provide many browser APIs these apps need: `XMLHttpRequest`, `WebSocket`, `Worker`, `requestAnimationFrame`, `IntersectionObserver`, `ResizeObserver`, `getComputedStyle`, `matchMedia`, `history`, `crypto`, `TextEncoder`, `atob`/`btoa`, `Event`/`CustomEvent`, `performance`, `element.style`, `dataset` and `innerText` are undefined, and `MutationObserver` is a no-op stub. Such apps often render an empty shell. See [limitations.md](./limitations.md) for the full table.
+- **Client-rendered apps** (React, Vue, Angular or Svelte SPAs, including your local dev server at `http://localhost:3000`): use `--engine chrome`. The native engine's page runtime covers the common DOM APIs, but not all the browser APIs these apps need: `WebSocket`, `Worker`, `crypto`, `indexedDB`, `customElements` and `document.cookie` are undefined, there is no real layout, and `MutationObserver` is a no-op stub. Such apps often render an empty shell. See [limitations.md](./limitations.md) for the full table.
 - **Server-rendered pages** (documentation, articles, marketing sites, classic multi-page apps, most search results): `--engine native` is lighter and faster, and supports every Orbis locator.
 
 For predictable behaviour, set the engine explicitly:
@@ -177,7 +177,7 @@ Differences that matter:
 | Locators in `memora_act` | All Orbis locators ([locators.md](./locators.md)). | `@N` IDs from the latest snapshot, or **Playwright selector syntax** (CSS, `text=`, `xpath=`, `role=`). Orbis-only prefixes such as `label:` and `placeholder:` do not work. |
 | Stealth | Orbis stealth headers and fingerprint script ([stealth.md](./stealth.md)). | Only the user agent override and `--disable-blink-features=AutomationControlled`. The Orbis fingerprint script is not injected. |
 | `memora_fork` | In-memory clone of URL, serialized DOM, cookies and storage. | Opens a new tab and re-navigates to the same URL (fresh load). |
-| Cookies | Per-page jar keyed by name only (see [security.md](./security.md)). | Chrome's real, domain-scoped cookie store. |
+| Cookies | Per-page jar, scoped by domain, path, `Secure` and expiry like a browser. | Chrome's real, domain-scoped cookie store. |
 | `--proxy-bearer-token` | Supported for http(s) proxies. | Ignored (prints a warning). Use `user:pass@` in the proxy URL instead. |
 
 ## Passing network options
@@ -195,13 +195,15 @@ All network flags from [cli-reference.md](./cli-reference.md) work in MCP mode. 
 ]
 ```
 
+**Prompt injection firewall (0.2.0+).** Add `"--firewall", "standard"` to make risky tools (JavaScript, cookies, storage, session files, form submits) ask you before they run, keep the agent on sites you allow, and label page text as untrusted for the model. See [prompt-injection-firewall.md](./prompt-injection-firewall.md).
+
 `--port`, `--host`, `--protocol` and `--max-sessions` have no effect in MCP mode, because no network port is opened. See [network-and-proxies.md](./network-and-proxies.md) for proxy behaviour.
 
 ---
 
 ## Tool reference
 
-The server holds **one active page** for the lifetime of the process. Every tool operates on it. Tool names are `memora_*`. Calls to `orbis_*` names are accepted as aliases (for example `orbis_browse` Ã¢â€ â€™ `memora_browse`), but `tools/list` advertises only the `memora_*` names. All results are returned as a single `text` content item. Failures return `isError: true` with the text `Error executing <tool>: <message>`.
+The server holds **one active page** for the lifetime of the process. Every tool operates on it. Tool names are `memora_*`. Calls to `orbis_*` names are accepted as aliases (for example `orbis_browse` → `memora_browse`), but `tools/list` advertises only the `memora_*` names. All results are returned as a single `text` content item. Failures return `isError: true` with the text `Error executing <tool>: <message>`.
 
 ### Summary
 
@@ -222,9 +224,10 @@ The server holds **one active page** for the lifetime of the process. Every tool
 | `memora_cookies` | List, set and clear cookies | yes |
 | `memora_session` | Save or load a session file | yes (filesystem) |
 | `memora_fork` | Clone the page and switch to the clone | yes |
-| `memora_handoff` | Let a person complete a CAPTCHA or bot check in a visible window (unreleased) | yes (switches engine on success) |
+| `memora_handoff` | Let a person complete a CAPTCHA or bot check in a visible window (0.1.2+) | yes (switches engine on success) |
+| `memora_firewall` | Show the prompt injection firewall's rules and recent activity; cannot change them (0.2.0+) | no |
 
-**Challenge pages (unreleased builds).** When a page is a CAPTCHA interstitial, block page or 429, `memora_browse`, `memora_act`, `memora_fill_form` and `memora_reload` return a `# CHALLENGE DETECTED` block instead of page content, and further requests to that host pause for 60 s. With `--on-challenge stop` the same text comes back as an error. See [challenges.md](./challenges.md).
+**Challenge pages (0.1.2+).** When a page is a CAPTCHA interstitial, block page or 429, `memora_browse`, `memora_act`, `memora_fill_form` and `memora_reload` return a `# CHALLENGE DETECTED` block instead of page content, and further requests to that host pause for 60 s. With `--on-challenge stop` the same text comes back as an error. See [challenges.md](./challenges.md).
 
 ### `memora_browse`
 
@@ -260,9 +263,9 @@ The action map is **never truncated**, and every line carries a CSS selector, of
 - After the first load, use `memora_diff` or a focused `memora_inspect` instead of browsing again.
 - Use `memora_extract` with a precise selector when you need specific data, not the whole page.
 
-> **Known issue (0.1.0):** When `focus` or `exclude` is set, the action IDs in that output are numbered within the filtered view, but `memora_act` and `memora_fill_form` resolve `@N` against the **whole** page. `@3` in a focused result can therefore point to a different element. After a filtered `memora_browse` or `memora_inspect`, act with the `selector` shown on the line (for example `#email`) or a locator such as `label:Email`, not the `@N`. Unfiltered output is safe to act on by ID.
+When `focus` or `exclude` is set, the action IDs in that output are numbered within the filtered view, and `memora_act` and `memora_fill_form` resolve `@N` to the element shown with that number in the filtered output.
 
-The tool descriptions returned by `tools/list` include marketing wording ("95% token savings"). Treat it as text, not a measured guarantee. See [Known issues](#known-issues).
+The tool descriptions returned by `tools/list` say that the output usually uses far fewer tokens than raw HTML. On the project's four benchmark pages the reduction was 33–40%; on link-dense pages it can be smaller or negative, as shown above.
 
 ### `memora_act`
 
@@ -276,7 +279,7 @@ Clicks or types on one element.
 
 Returns `Successfully performed "<type>" on <actionId>.`, then the current URL, title and the **full new action map**.
 
-- On the native engine a click performs the browser's **default action**: links are followed, submit buttons submit their form, checkboxes and radios toggle, `<option>`s are selected. This differs from the SDKs' `act()`, which only dispatches the click event.
+- On the native engine a click performs the browser's **default action**: links are followed, submit buttons submit their form, checkboxes and radios toggle, `<option>`s are selected. The SDKs' `act()` behaves the same way.
 - If the target is not found, the native engine returns `isError` with `Element "<target>" not found` for clicks and `Could not type into element "<target>"` for typing.
 - On the Chrome engine, a `@N` that is not in the latest snapshot fails with a hint to call `memora_inspect`. After each action the engine waits 600 ms for transitions.
 
@@ -286,7 +289,7 @@ Fills several fields in one call.
 
 | Input | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `fields` | object (string Ã¢â€ â€™ string) | yes | Locator Ã¢â€ â€™ value. Checkboxes and radios accept `true`/`1`/`yes`/`checked`/`on`. |
+| `fields` | object (string → string) | yes | Locator → value. Checkboxes and radios accept `true`/`1`/`yes`/`checked`/`on`. |
 | `submitActionId` | string | no | Locator of the button (or `form`) to activate after filling. **If omitted, the form is not submitted.** |
 
 Returns `Form fill completed! Filled <n> field(s)[, submitted form].`, then the URL, title and new action map.
@@ -309,7 +312,9 @@ Mutated (1 elements):
   * [@3] [checkbox] "Remember me" (checked: undefined -> true)
 ```
 
-Every tool that produces a snapshot (`browse`, `act`, `fill_form`, `inspect`, `reload`, `session load`) resets the baseline. In practice, `memora_diff` after `memora_act` usually reports "No ... changes detected", because `memora_act` already returned the new action map. Use `memora_diff` after `memora_eval`, `memora_storage` or a wait, when the page may have changed without a snapshot being taken.
+The baseline is set by `memora_browse`, `memora_reload`, `memora_inspect`, `memora_diff` itself, and a resolved `memora_handoff`. `memora_act` and `memora_fill_form` do **not** move it, so `memora_diff` after one or more actions shows everything those actions changed. It is also useful after `memora_eval`, `memora_storage` or a wait.
+
+> **Changed in 0.2.0:** in 0.1.x, `memora_act` and `memora_fill_form` reset the baseline, so `memora_diff` right after them usually reported no changes.
 
 ### `memora_inspect`
 
@@ -319,7 +324,7 @@ Every tool that produces a snapshot (`browse`, `act`, `fill_form`, `inspect`, `r
 
 Returns the title, URL, interactive count and the action map. No Markdown.
 
-> **Important:** `@N` numbers from a **focused** inspection are counted within the focused subtree. On the native engine, `memora_act` resolves `@N` against the whole page, so a focused `@2` can point at a different element. Act with the `selector` shown in the focused line, or re-inspect without `focus` first.
+`@N` numbers from a **focused** inspection are counted within the focused subtree, and `memora_act` resolves them to the elements shown in that inspection.
 
 ### `memora_extract`
 
@@ -337,7 +342,7 @@ Returns a JSON array. Without `attribute`, each item is `{ "tag", "text", "attri
 | :--- | :--- | :--- | :--- |
 | `selector` | string | no | CSS selector. When omitted, the whole document is returned. |
 
-Returns raw HTML (`outerHTML`), or `Element "<selector>" not found.`. Whole-document HTML is not truncated and can be very large. Prefer a selector.
+Returns raw HTML (`outerHTML`), or `Element "<selector>" not found.`. The whole document starts with `<!DOCTYPE html>`. Whole-document HTML is not truncated and can be very large. Prefer a selector.
 
 ### `memora_metadata`
 
@@ -371,15 +376,13 @@ No inputs. Reloads the current URL. Returns the duration, HTTP status, title, el
 | :--- | :--- | :--- | :--- |
 | `code` | string | yes | JavaScript expression or statements, evaluated in the page. |
 
-On the native engine, code runs synchronously in the page's V8 sandbox with a **5-second timeout**. The result is wrapped in a type descriptor and pretty-printed:
+Both engines return plain values: a string comes back as-is (`Example Domain`), and any other value as JSON (`{"a": 1}`, `42`, `true`). If the code returns a promise (for example `fetch(...).then(r => r.status)` or an async function), the tool waits for it.
 
-```json
-{ "type": "string", "value": "Example Domain" }
-```
+On the native engine, the code itself runs synchronously in the page's sandbox with a **5-second timeout**, and a returned promise is awaited for up to **10 seconds**. After that the tool returns an error, `Timed out waiting for the promise`. An exception, or a rejected promise, comes back as a tool error (`isError: true`) with its message.
 
-Objects come back as `{ "type": "object", "value": { ... } }`, and errors as `{ "error": "..." }`. **Promises are not awaited.** `fetch(...)` or an async IIFE returns `{ "type": "object", "value": {} }`. To read async results, store them on `window` in one call (`fetch(u).then(r => r.text()).then(t => window.__r = t)`) and read `window.__r` in a later call.
+On the Chrome engine, the code goes to Playwright's `page.evaluate`.
 
-On the Chrome engine, the code goes to Playwright's `page.evaluate`, which awaits promises and returns plain values.
+> **Changed in 0.2.0:** in 0.1.x the native engine did not await promises and wrapped results in `{ "type": "...", "value": ... }` (errors as `{ "error": "..." }`). If you parse `memora_eval` output, read the plain value instead.
 
 See [Security](#security) before enabling this tool for untrusted prompts.
 
@@ -402,18 +405,16 @@ A common use is pre-authenticating a single-page app: `set` a token key, then `m
 | `name` | string | set | Cookie name. |
 | `value` | string | set | Cookie value. |
 
-Native engine: the jar maps cookie **names** to values, with no domain, path or expiry. A cookie set here is sent to **every host** the page requests.
+Native engine: cookies are scoped like in a browser (domain, path, `Secure`, expiry), so a cookie from one site is not sent to other sites. `list` shows the cookies for the current site, `set` sets a cookie for the current site, and `clear` removes all cookies.
 
-> **Known issue (0.1.0):** On the native engine, `memora_cookies` with `action: "clear"` replies "All cookies cleared" but removes nothing. It merges an empty object into the jar (verified: a cookie set before `clear` is still listed after it). Loading a session also merges rather than replaces. Restarting the MCP server is the only reliable way to drop cookies.
-
-On the Chrome engine, `set` scopes the cookie to the current page's hostname and `clear` works.
+On the Chrome engine, `set` also scopes the cookie to the current page's hostname, and `clear` works the same way.
 
 ### `memora_session`
 
 | Input | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `action` | `"save"` \| `"load"` | yes | Operation. |
-| `path` | string | yes | File path on the machine running the MCP server, resolved relative to the server's working directory. |
+| `path` | string | yes | A `.json` file path on the machine running the MCP server, resolved relative to the folder the server was started in (or `ORBIS_SESSION_DIR`, if set). Paths outside that folder, or not ending in `.json`, are refused with a tool error. |
 
 `save` writes cookies, `localStorage` and `sessionStorage` (version-1 JSON, see [sessions-and-auth.md](./sessions-and-auth.md)) and creates parent directories. `load` restores them into the current page and does not navigate. Session files contain authentication cookies in plain text.
 
@@ -428,7 +429,7 @@ Use it to try a risky path when you can afford to lose the original. To return t
 
 ### `memora_handoff`
 
-> **Availability:** unreleased; not in 0.1.0, 0.1.1 or 0.1.2.
+> **Availability:** added in 0.1.2.
 
 | Input | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
@@ -437,7 +438,7 @@ Use it to try a risky path when you can afford to lose the original. To return t
 
 Opens the page in a **visible** Chrome/Edge window so the user can complete a CAPTCHA or bot check themselves. The agent should tell the user to do so, then poll `status`. Orbis does not interact with the window. When the state becomes `resolved`, the server's active engine **switches to that window** (the previous engine is closed) and the result includes the new page's action map. Later tool calls run in the visible window.
 
-Outputs: `Handoff started: Ã¢â‚¬Â¦`, `Handoff state: waiting | expired | cancelled | unavailable | idle` (with `Reason:` where relevant), or `Handoff resolved: Ã¢â‚¬Â¦`.
+Outputs: `Handoff started: …`, `Handoff state: waiting | expired | cancelled | unavailable | idle` (with `Reason:` where relevant), or `Handoff resolved: …`.
 
 - Timeout: `--handoff-timeout <sec>` (default 300).
 - `unavailable` without a display (Linux servers, containers) or without Chrome/Edge.
@@ -452,15 +453,15 @@ Full behaviour: [challenges.md](./challenges.md#5-human-handoff-mcp).
 | Item | Value |
 | :--- | :--- |
 | Transport | stdio, newline-delimited JSON-RPC 2.0 (one message per line, no `Content-Length` framing) |
-| `protocolVersion` returned by `initialize` | `2024-11-05` |
-| `serverInfo` | `{ "name": "orbis-browser", "version": "0.1.0", "title": "Orbis by Memora" }` |
+| `protocolVersion` returned by `initialize` | The version the client asks for, from `2024-11-05` up to `2025-11-25`; for an unknown version, the newest one supported |
+| `serverInfo` | `{ "name": "orbis-browser", "version": "0.2.0", "title": "Orbis by Memora" }` |
 | Capabilities | `tools` only (no resources, prompts, sampling or logging) |
 | Methods implemented | `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call` |
 | Unknown method | JSON-RPC error `-32601 Method not found` |
 | Unparseable line | JSON-RPC error `-32700` with `id: null` |
 | Shutdown | `SIGINT` / `SIGTERM` close the engine and exit. On the Chrome engine this closes Chrome. |
 
-Requests are handled as they arrive and are **not queued**. A client that sends a second `tools/call` before the first finishes runs both against the same page at once. In testing, piping a `memora_browse` and a `memora_act` back-to-back made the `act` run on the empty start page and fail with `Could not type into element`, because the navigation had not finished. Interactive clients call tools one at a time. If you write your own client, wait for each response before sending the next call.
+Tool calls run **one at a time, in the order they arrive**. A client that sends a second `tools/call` before the first finishes gets it run after the first one completes, so piping a `memora_browse` and a `memora_act` back-to-back works as expected.
 
 ## Testing the server by hand
 
@@ -472,7 +473,7 @@ printf '%s\n' \
 | ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/memora-orbis --mcp --engine native
 ```
 
-Expected: three JSON lines. The second lists 15 tools, and the third contains `# Page Loaded: Example Domain`. The process stays alive until stdin closes or you press Ctrl+C.
+Expected: three JSON lines. The second lists 17 tools, and the third contains `# Page Loaded: Example Domain`. The process stays alive until stdin closes or you press Ctrl+C.
 
 A scripted test client is in [`examples/06-mcp-server/test_mcp_client.ts`](../examples/06-mcp-server/). The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) also works:
 
@@ -489,12 +490,13 @@ Giving a model these tools gives it a browser, a JavaScript console and limited 
 | Risk | Detail | Mitigation |
 | :--- | :--- | :--- |
 | Arbitrary JavaScript | `memora_eval` runs any code in the page context. A prompt-injected instruction could read tokens from storage and send them to another site with `fetch`. | Disable or require approval for `memora_eval` in your client's tool permissions. Keep "always allow" off for it. |
-| Filesystem read and write | `memora_session` writes and reads JSON files at any path the server process can access. `load` only accepts valid session JSON, but `save` overwrites any file. | Run the server under a low-privilege account and working directory. Require approval for `memora_session`. |
-| Secrets in context | Values typed with `memora_act` or `memora_fill_form` are stored in the element's `value` attribute. They appear as `value="..."` in later action maps, diff summaries and `memora_html` output, **including passwords**, and therefore in the model transcript. | Do not let the model type real secrets. Pre-authenticate with `memora_session load` or `memora_storage set` from a prepared file instead. |
-| Cookie leakage (native engine) | Cookies are not scoped by domain. A session cookie obtained on one site is sent to every other site the page visits afterwards. | Use one MCP server per trust domain. Do not browse arbitrary sites after loading an authenticated session, or use `--engine chrome`. |
+| Filesystem read and write | `memora_session` reads and writes `.json` files, but only inside the folder the server was started in (or `ORBIS_SESSION_DIR`). `save` can overwrite a session file there. | Start the server in a dedicated folder, or set `ORBIS_SESSION_DIR`. Require approval for `memora_session`. |
+| Secrets in context | Values typed with `memora_act` or `memora_fill_form` are hidden in later action maps (`[FILLED]`) and diff summaries, and password values are never included. They are still in the page, so `memora_html` and `memora_eval` can return them. | Do not let the model type real secrets. Pre-authenticate with `memora_session load` or `memora_storage set` from a prepared file instead. |
 | Internal network access | The server can fetch `localhost`, intranet hosts and cloud metadata endpoints (`169.254.169.254`). | Run it where it cannot reach sensitive internal services. Do not run it on servers that hold cloud credentials. |
 | Robots and terms of service | The server does not check `robots.txt` unless told to. | Add `--obey-robots` and an honest `--user-agent` for crawling-style tasks. |
 | Version check | On start-up the CLI contacts `orbis.memora.company` unless `ORBIS_NO_TELEMETRY` is set. | Set `ORBIS_NO_TELEMETRY=1`. |
+
+The 0.2.0 [prompt injection firewall](./prompt-injection-firewall.md) covers several of these risks inside Orbis itself: `--firewall standard` makes `memora_eval`, `memora_cookies`, `memora_storage`, `memora_session` and form submits ask you first, and `--allow-domain` / the built-in sensitive-site list keep the agent away from internal addresses, webmail and banking.
 
 See [security.md](./security.md) for the full hardening guide.
 
@@ -504,27 +506,16 @@ See [security.md](./security.md) for the full hardening guide.
 | :--- | :--- |
 | `npm error 404 Not Found - memora-orbis` | Wrong package name. Use `@memoracompany/memora-orbis`. |
 | Server shows as failed or disconnected immediately | Node.js older than 20, or `npx` not on the client's `PATH` (common for GUI apps on macOS and Windows). Use an absolute path to `npx`/`orbis`, or install globally. |
-| Client reports a JSON parse error at start-up | The version-check banner was printed to stdout. Set `ORBIS_NO_TELEMETRY=1`. |
-| `No Google Chrome or Microsoft Edge executable found` | `--engine chrome` on a machine without Chrome or Edge at the known paths. Install one, or use `--engine native`. |
+| `--engine chrome needs Google Chrome or Microsoft Edge installed` | `--engine chrome` on a machine without Chrome or Edge at the known paths. Install one, or use `--engine native`. |
 | Locators like `label:Email` fail | You are on the Chrome engine (the default when Chrome is installed). Use `@N`, Playwright selectors, or `--engine native`. |
 | Pages look empty | The site renders everything client-side and the native engine could not execute it. Check `memora_console`, then try `--engine chrome`. |
 | Page content cut off | `memora_browse` truncates Markdown at 4,000 characters. Use `focus`, `memora_extract` or `memora_html`. |
-| `# CHALLENGE DETECTED` / `Requests to <host> are paused` (unreleased) | The site served a CAPTCHA, bot check, block page or 429. Wait, or use `memora_handoff` so the user can complete it. See [challenges.md](./challenges.md). |
+| `# CHALLENGE DETECTED` / `Requests to <host> are paused` (0.1.2+) | The site served a CAPTCHA, bot check, block page or 429. Wait, or use `memora_handoff` so the user can complete it. See [challenges.md](./challenges.md). |
 | `memora_handoff` returns `unavailable: no display` | The server runs where no window can be shown (Linux server or container). Run the MCP server on the user's desktop. |
 
 More in [troubleshooting.md](./troubleshooting.md).
 
 ## Known issues
-
-> **Known issue (0.1.0):** The start-up version check writes its "UPDATE AVAILABLE" message with `console.log`, which goes to stdout, the MCP transport. Set `ORBIS_NO_TELEMETRY=1` for every MCP configuration.
-
-> **Known issue (0.1.0):** On the native engine, `memora_cookies` `clear` does not remove existing cookies (it merges an empty object into the jar).
-
-> **Known issue (0.1.0):** `tools/call` requests are processed concurrently, not in order, so overlapping calls race on the single active page.
-
-> **Known issue (0.1.0):** `memora_eval` on the native engine does not await promises and wraps results in `{ "type", "value" }`, unlike the Chrome engine.
-
-> **Known issue (0.1.0):** The `memora_browse` description advertises "95% token savings". The measured reduction on the project's own benchmark pages is about 37% on average (33Ã¢â‚¬â€œ40% across four fixture pages, Windows 11 laptop, Node 22, 30 Oct 2026). Savings on real pages depend heavily on the page.
 
 > **Known issue (0.1.0):** `--engine auto` silently switches to Chrome when Chrome or Edge is installed, so behaviour differs between machines. Pin `--engine native` or `--engine chrome` in shared configurations.
 

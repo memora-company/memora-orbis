@@ -1,8 +1,8 @@
 # Use-Case Cookbook
 
-These are production-style recipes for Orbis. Each one covers the problem, when Orbis fits it (and when it doesn't), complete code, the output you should expect, and notes for running it in production. Unless a recipe says otherwise, every TypeScript sample was type-checked against the 0.1.0 type definitions and run end to end against local fixture pages that mimic the target sites. The **Verified** line on each recipe says exactly what was run.
+These are production-style recipes for Orbis. Each one covers the problem, when Orbis fits it (and when it doesn't), complete code, the output you should expect, and notes for running it in production. Unless a recipe says otherwise, every TypeScript sample was type-checked and run end to end against local fixture pages that mimic the target sites. The **Verified** line on each recipe says exactly what was run. Those runs were made on 0.1.0; where 0.2.0 changed behaviour (awaited `act()`, `fillForm()` no longer submitting by default, link following, cookie and storage handling), the samples were updated to match.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -41,9 +41,9 @@ await page.goto(url);
 console.log(page.getLogs().filter(l => l.type === 'error'));
 ```
 
-Errors such as `XMLHttpRequest is not defined` or `Cannot set properties of undefined (setting 'display')` mean the page needs browser APIs Orbis doesn't implement. For those pages, use the MCP server's Chrome engine (`--engine chrome`, [mcp.md](mcp.md)) or a real browser.
+Errors such as `WebSocket is not defined` or `Worker is not defined` mean the page needs browser APIs Orbis doesn't implement. For those pages, use the MCP server's Chrome engine (`--engine chrome`, [mcp.md](mcp.md)) or a real browser.
 
-The engine also doesn't support `<iframe>` content, canvas or WebGL, screenshots (a 1Ã—1 placeholder is returned), file uploads, `alert()`/`confirm()`, WebSockets or Workers.
+The engine also doesn't support `<iframe>` content, canvas or WebGL, screenshots (a 1×1 placeholder is returned), file uploads, `alert()`/`confirm()`, WebSockets or Workers.
 
 ## Running the samples
 
@@ -55,7 +55,7 @@ npm install -D tsx typescript @types/node
 npx tsx price-watch.ts
 ```
 
-The samples use `new OrbisBrowser()` and `new OrbisAgent(browser, page)` instead of `OrbisAgent.launch()`. `launch()` also starts a CDP server, which listens on all network interfaces with no authentication enforced (see [security.md](security.md)). A script that only drives pages in-process doesn't need that open port.
+The samples use `new OrbisBrowser()` and `new OrbisAgent(browser, page)` instead of `OrbisAgent.launch()`. `launch()` also starts a CDP server (see [security.md](security.md)). A script that only drives pages in-process doesn't need that port.
 
 Python samples need a running daemon (`npx -y @memoracompany/memora-orbis --port 9222 --host 127.0.0.1`) and `pip install memora-orbis`. See [python-sdk.md](python-sdk.md).
 
@@ -65,16 +65,16 @@ Python samples need a running daemon (`npx -y @memoracompany/memora-orbis --port
 
 **Problem.** An assistant must answer questions by reading live web pages: open a page, follow links, fill a search box, and cite where each fact came from.
 
-**Why Orbis fits.** Each page becomes a numbered action list (`@1`, `@2`, â€¦) plus Markdown, so the model chooses an ID instead of writing selectors. After an action, `diff().summary` reports only what changed, which keeps follow-up turns small.
+**Why Orbis fits.** Each page becomes a numbered action list (`@1`, `@2`, …) plus Markdown, so the model chooses an ID instead of writing selectors. After an action, `diff().summary` reports only what changed, which keeps follow-up turns small.
 
 **When it doesn't fit.** Client-rendered apps that don't render in the native engine (see above), and tasks that need visual judgement (charts, images, layout).
 
-**Verified.** The `browser-tools.ts` tool layer was run with scripted tool calls against fixtures (browse, type into email and password, submit, follow a link, unknown IDs), including the password scrubbing. The Claude loop follows the official SDK's tool-use shapes but was not run against the API.
+**Verified.** The `browser-tools.ts` tool layer was run with scripted tool calls against fixtures (browse, type into email and password, submit, follow a link, unknown IDs). The Claude loop follows the official SDK's tool-use shapes but was not run against the API.
 
 `browser-tools.ts`. This tool layer is independent of the LLM provider:
 
 ```ts
-// browser-tools.ts â€” Orbis-backed tools for an LLM agent
+// browser-tools.ts — Orbis-backed tools for an LLM agent
 import { OrbisAgent, OrbisBrowser, type SemanticPageSnapshot } from '@memoracompany/memora-orbis';
 
 const MAX_VIEW_CHARS = 12_000; // hard cap on what one tool result may add to the context
@@ -85,13 +85,9 @@ export function createBrowserTools() {
   const browser = new OrbisBrowser();
   const agent = new OrbisAgent(browser, browser.newPage());
 
-  // Values typed into password fields show up in later action maps and diffs
-  // (as the element's text and value). Scrub them from everything the model sees.
-  const secrets = new Set<string>();
-  const scrub = (text: string) => {
-    for (const s of secrets) text = text.split(s).join('[REDACTED]');
-    return text.slice(0, MAX_VIEW_CHARS);
-  };
+  // Typed values never appear in action maps or diffs (text fields show [FILLED]),
+  // so the only post-processing needed is a size cap.
+  const cap = (text: string) => text.slice(0, MAX_VIEW_CHARS);
 
   // Compact action map without CSS selectors: on link-heavy pages the selectors
   // in actionMapText can outweigh the page content itself
@@ -101,10 +97,9 @@ export function createBrowserTools() {
       .map(a => `[${a.actionId}] ${a.role}${a.isInput && a.type ? `(${a.type})` : ''} "${a.text}"${a.href ? ` -> ${a.href}` : ''}`)
       .join('\n');
 
-  // Action IDs must come from an UNFILTERED snapshot: act()/activate() resolve @N against the
-  // whole page, so focus/exclude filters are applied to the Markdown only.
+  // The action map lists every control on the page; focus/exclude filters are applied to the Markdown only
   const view = (snap: SemanticPageSnapshot) =>
-    scrub(`URL: ${snap.url}\nTitle: ${snap.title}\n\nActions:\n${compactMap(snap)}\n\n--- Page content ---\n${agent.markdown({ excludeSelectors: NOISE })}`);
+    cap(`URL: ${snap.url}\nTitle: ${snap.title}\n\nActions:\n${compactMap(snap)}\n\n--- Page content ---\n${agent.markdown({ excludeSelectors: NOISE })}`);
 
   async function run(name: string, input: any): Promise<string> {
     switch (name) {
@@ -116,14 +111,12 @@ export function createBrowserTools() {
         // activate() = browser default action: follows links, submits forms, toggles checkboxes
         const navigated = await agent.page.activate(input.actionId);
         if (navigated) return view(agent.snapshot());
-        return scrub(agent.diff().summary);
+        return cap(agent.diff().summary);
       }
       case 'type': {
-        const target = agent.page.resolveElement(input.actionId);
-        if (!target) return `No element matches ${input.actionId}. Call "look" to get fresh action IDs.`;
-        if (target.getAttribute('type') === 'password' && input.text) secrets.add(input.text);
-        agent.act(input.actionId, input.text);
-        return scrub(agent.diff().summary);
+        const ok = await agent.act(input.actionId, input.text); // async in 0.2.0: always await
+        if (!ok) return `No element matches ${input.actionId}. Call "look" to get fresh action IDs.`;
+        return cap(agent.diff().summary);
       }
       case 'look':
         return view(agent.snapshot());
@@ -139,7 +132,7 @@ export function createBrowserTools() {
 `research-agent.ts`. The Claude tool-use loop:
 
 ```ts
-// research-agent.ts â€” Claude drives Orbis through tool use
+// research-agent.ts — Claude drives Orbis through tool use
 import Anthropic from '@anthropic-ai/sdk';
 import { createBrowserTools } from './browser-tools.js';
 
@@ -235,21 +228,13 @@ Actions:
 ...
 ```
 
-Clicks that don't navigate, and typing, return a diff:
+Clicks that don't navigate, and typing, return a diff (`=== PAGE STATE DELTA ===`). The text you typed is never repeated in it: a text field's value shows as `[filled]` or `[empty]`, and the action map shows `[FILLED]` for filled fields.
 
-```text
-=== PAGE STATE DELTA ===
-
-Mutated (1 elements):
-  * [@2] [input] "[REDACTED]" (text: "[Untitled input]" -> "[REDACTED]", value: undefined -> "[REDACTED]")
-```
-
-**Python variant.** Python goes through the daemon's REST API. In 0.1.0, `act()` doesn't follow links or submit forms, so the tool layer navigates explicitly. The `/orbis/act` endpoint also resets the diff baseline, so the tool reads a fresh snapshot instead of calling `diff()`.
+**Python variant.** Python goes through the daemon's REST API. `act()` follows links and submits forms there too, so the tool layer is a thin wrapper.
 
 ```python
-# browser_tools.py â€” the same tool layer in Python, through a running Orbis daemon
+# browser_tools.py — the same tool layer in Python, through a running Orbis daemon
 import os
-from urllib.parse import urljoin
 
 from orbis import OrbisAgent
 
@@ -260,54 +245,27 @@ class BrowserTools:
     def __init__(self, base_url: str = os.environ.get("ORBIS_URL", "http://127.0.0.1:9222")):
         # One daemon per worker: every client of a daemon shares its default page
         self.agent = OrbisAgent.connect(base_url)
-        self.last = None  # most recent OrbisSnapshot
-        self.secrets: set[str] = set()  # values typed into password fields
-
-    def _scrub(self, text: str) -> str:
-        for secret in self.secrets:
-            text = text.replace(secret, "[REDACTED]")
-        return text[:MAX_VIEW_CHARS]
 
     def _view(self, snap) -> str:
-        self.last = snap
         # Compact action map without CSS selectors
         actions = "\n".join(
             f'[{a["actionId"]}] {a["role"]} "{a["text"]}"' + (f' -> {a["href"]}' if a.get("href") else "")
             for a in snap.actions
             if not a.get("disabled")
         )
-        return self._scrub(
-            f"URL: {snap.url}\nTitle: {snap.title}\n\nActions:\n{actions}\n\n--- Page content ---\n{snap.markdown}"
-        )
-
-    def _action(self, action_id: str):
-        return next((a for a in (self.last.actions if self.last else []) if a["actionId"] == action_id), None)
+        text = f"URL: {snap.url}\nTitle: {snap.title}\n\nActions:\n{actions}\n\n--- Page content ---\n{snap.markdown}"
+        return text[:MAX_VIEW_CHARS]
 
     def run(self, name: str, args: dict) -> str:
         if name == "browse":
             return self._view(self.agent.goto(args["url"]))
         if name == "look":
             return self._view(self.agent.snapshot())
-        if name == "click":
-            action = self._action(args["actionId"])
-            if action and action.get("href") and not action["href"].startswith(("#", "javascript:")):
-                # 0.1.0: act() dispatches a click event but does not follow links; navigate explicitly
-                return self._view(self.agent.goto(urljoin(self.last.url, action["href"])))
-            if action and action.get("type") == "submit":
-                # ...and does not submit forms; fill_form with a submit target does
-                self.agent.fill_form({}, submit=args["actionId"])  # type: ignore[arg-type]
-                return self._view(self.agent.snapshot())
-            self.agent.act(args["actionId"])
-            return self._view(self.agent.snapshot())
-        if name == "type":
-            action = self._action(args["actionId"])
-            if action and action.get("type") == "password":
-                self.secrets.add(args["text"])
-            result = self.agent.act(args["actionId"], args["text"])
+        if name in ("click", "type"):
+            # act() follows links and submits forms; typed text shows as [FILLED] in later snapshots
+            result = self.agent.act(args["actionId"], args.get("text"))
             if not result.get("success"):
                 return f"No element matches {args['actionId']}. Call look for fresh action IDs."
-            # /orbis/act snapshots the page after acting, which resets the diff baseline:
-            # read the new state instead of calling diff()
             return self._view(self.agent.snapshot())
         raise ValueError(f"Unknown tool {name}")
 ```
@@ -361,12 +319,12 @@ if __name__ == "__main__":
 
 **Production notes.**
 
-- **Secrets leak into snapshots.** A value typed into a field becomes that element's `text` and `value` in later action maps and diffs, and that includes passwords. Fill credentials in code (recipe 5), or scrub them as the samples do. Don't let the model type passwords it shouldn't see.
+- **Typed values stay out of snapshots.** Action maps show `[FILLED]` for text fields instead of their value, typed text never becomes an element's label, password values are never included, and diffs show `[filled]`/`[empty]`. Still fill credentials in code (recipe 5): a model that types a password has seen it.
 - **Token cost.** The full `actionMapText` includes a CSS selector on every line. On link-heavy real pages that can be larger than the raw HTML. Use a compact map as shown, apply `excludeSelectors`/`focusSelector` to the Markdown, and keep a hard character cap. See [best-practices.md](best-practices.md#2-token-budgeting).
-- **Take IDs from unfiltered snapshots.** `act()`/`activate()` resolve `@N` against the whole page. A snapshot taken with `focusSelector` or `excludeSelectors` numbers elements differently, and the model would click the wrong thing. That's why `view()` filters only the Markdown.
-- **Use `activate()` for clicks.** `agent.act('@3')` only dispatches a click event. It doesn't follow links or submit forms. `agent.page.activate('@3')` does.
-- **Untrusted content.** Page text reaches the model, so treat it as prompt-injection input. Don't give the agent tools with side effects outside the browser without confirmation.
-- **Isolation.** Page JavaScript runs in a Node `vm` context, which is not a security boundary. Run agents that visit arbitrary sites in a container that holds no secrets (see [security.md](security.md)).
+- **Use IDs from the latest snapshot.** IDs from a focused or filtered snapshot resolve to the elements in that snapshot, but IDs are renumbered when the page changes, so hand the model fresh IDs after each navigation.
+- **Clicks.** `await agent.act('@3')` follows links and submits forms, like a browser click. `agent.page.activate('@3')` does the same and tells you whether the page navigated, which the sample uses to choose between a full view and a diff.
+- **Untrusted content.** Page text reaches the model, so treat it as prompt-injection input. Don't give the agent tools with side effects outside the browser without confirmation. Orbis also has an optional prompt injection firewall, off by default (see [prompt-injection-firewall.md](prompt-injection-firewall.md)).
+- **Isolation.** Page JavaScript is sandboxed and can't reach the host process through known routes, but the sandbox is hardened rather than perfect. Run agents that visit arbitrary sites in a container that holds no secrets (see [security.md](security.md)).
 - **Python daemons.** Every client of a daemon shares its default page. Run one daemon per worker.
 
 ---
@@ -382,7 +340,7 @@ if __name__ == "__main__":
 **Verified.** Run against fixture pages: two docs pages plus a 404, giving 4 chunks, with the canonical URL used as the ID and the 404 skipped.
 
 ```ts
-// ingest-docs.ts â€” turn documentation pages into RAG-ready JSONL chunks
+// ingest-docs.ts — turn documentation pages into RAG-ready JSONL chunks
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
@@ -474,7 +432,7 @@ The CLI has no focus or exclude options for Markdown. `--dump-selector main` ret
 **Verified.** Run against fixtures: a fully tagged product page produced no findings, and a bare page produced 2 errors and 4 warnings, so the script exited with code 1.
 
 ```ts
-// seo-audit.ts â€” metadata checks for a list of URLs; exits 1 when any page has errors (CI-friendly)
+// seo-audit.ts — metadata checks for a list of URLs; exits 1 when any page has errors (CI-friendly)
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const URLS = (process.env.AUDIT_URLS ?? 'https://shop.example.com/product/1').split(',');
@@ -518,12 +476,12 @@ process.exit(findings.some(f => f.level === 'error') ? 1 : 0);
 **Expected output.**
 
 ```text
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ (index) â”‚ url                                â”‚ level   â”‚ check         â”‚ detail                      â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ 0       â”‚ 'https://shop.example.com/bare'    â”‚ 'error' â”‚ 'title'       â”‚ 'missing <title>'           â”‚
-â”‚ 1       â”‚ 'https://shop.example.com/bare'    â”‚ 'error' â”‚ 'description' â”‚ 'missing meta description'  â”‚
-â”‚ 2       â”‚ 'https://shop.example.com/bare'    â”‚ 'warn'  â”‚ 'canonical'   â”‚ 'no <link rel="canonical">' â”‚
+┌─────────┬────────────────────────────────────┬─────────┬───────────────┬─────────────────────────────┐
+│ (index) │ url                                │ level   │ check         │ detail                      │
+├─────────┼────────────────────────────────────┼─────────┼───────────────┼─────────────────────────────┤
+│ 0       │ 'https://shop.example.com/bare'    │ 'error' │ 'title'       │ 'missing <title>'           │
+│ 1       │ 'https://shop.example.com/bare'    │ 'error' │ 'description' │ 'missing meta description'  │
+│ 2       │ 'https://shop.example.com/bare'    │ 'warn'  │ 'canonical'   │ 'no <link rel="canonical">' │
 ...
 ```
 
@@ -553,7 +511,7 @@ npx -y @memoracompany/memora-orbis fetch https://shop.example.com/product/1 --du
 
 - Meta `name`/`property` keys are lower-cased. Invalid JSON-LD blocks are skipped silently, so validate JSON-LD separately if it matters.
 - `settleTimeoutMs: 0` skips waiting for page scripts. That's fine for metadata and speeds up large audits.
-- Audit staging with `--http-header "Authorization: Bearer â€¦"` or `network.headers`, never with production credentials pasted into scripts.
+- Audit staging with `--http-header "Authorization: Bearer …"` or `network.headers`, never with production credentials pasted into scripts.
 
 ---
 
@@ -563,12 +521,12 @@ npx -y @memoracompany/memora-orbis fetch https://shop.example.com/product/1 --du
 
 **Why Orbis fits.** Product pages are usually server-rendered and carry JSON-LD `Offer` data. `extract()` reads CSS-selected text in one call. The runs are short-lived processes that suit cron.
 
-**When it doesn't fit.** Prices loaded by XHR after page load (`XMLHttpRequest` doesn't exist in the sandbox; `fetch()` does), prices shown as images, and sites whose terms forbid automated collection.
+**When it doesn't fit.** Prices pushed over WebSockets or loaded by synchronous `XMLHttpRequest` (only `fetch()` and async XHR are available in the sandbox), prices shown as images, and sites whose terms forbid automated collection.
 
 **Verified.** Two runs against a fixture product page. Run 1 printed `no changes` (and stored the baseline). After the fixture price changed, run 2 printed `129 -> 99.5 USD; stock "In stock" -> "Only 2 left"`.
 
 ```ts
-// price-watch.ts â€” detect price / stock changes and notify a webhook
+// price-watch.ts — detect price / stock changes and notify a webhook
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
@@ -632,9 +590,9 @@ https://shop.example.com/product/1: 129 -> 99.5 USD; stock "In stock" -> "Only 2
 **Production notes.**
 
 - Prefer structured data over CSS selectors. Selectors break on redesigns, and the sample reports `price not found` so you notice.
-- Run it every 15â€“60 minutes, not every minute. Pages rarely change faster, and frequent polling invites blocking.
+- Run it every 15–60 minutes, not every minute. Pages rarely change faster, and frequent polling invites blocking.
 - Keep `price-state.json` on durable storage. Concurrent runs need a lock (`flock` on Linux).
-- Check the retailer's terms of service and robots.txt. Add `network: { obeyRobots: true, robotsAgent: 'â€¦' }` for third-party sites.
+- Check the retailer's terms of service and robots.txt. Add `network: { obeyRobots: true, robotsAgent: '…' }` for third-party sites.
 
 ---
 
@@ -642,14 +600,14 @@ https://shop.example.com/product/1: 129 -> 99.5 USD; stock "In stock" -> "Only 2
 
 **Problem.** A nightly report needs numbers from an internal dashboard behind a login form. Logging in on every run is slow and trips lockout policies.
 
-**Why Orbis fits.** `fillForm()` fills the form by label and submits it. Redirect cookies (`Set-Cookie` on a 302) are captured, and `saveSession()`/`loadSession()` persist them to a JSON file.
+**Why Orbis fits.** `fillForm()` fills the form by label and submits it when you give it a submit target. Redirect cookies (`Set-Cookie` on a 302) are captured, and `saveSession()`/`loadSession()` persist cookies, `localStorage` and `sessionStorage` to a JSON file.
 
-**When it doesn't fit.** Login flows with CAPTCHAs, WebAuthn/passkeys, SSO through pages that need missing browser APIs, and apps that keep the auth token in `localStorage` (see the known issue below). Prefer an API token if the app has one.
+**When it doesn't fit.** Login flows with CAPTCHAs, WebAuthn/passkeys, and SSO through pages that need missing browser APIs. Prefer an API token if the app has one.
 
 **Verified.** Run against a fixture login. Run 1 logged in and saved the session. Run 2, with no credentials in the environment, reused the session file. Wrong credentials raised `login rejected (still on /login)`.
 
 ```ts
-// dashboard-report.ts â€” log in once, reuse the saved session on later runs
+// dashboard-report.ts — log in once, reuse the saved session on later runs
 import { chmodSync, existsSync } from 'node:fs';
 import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
@@ -698,22 +656,15 @@ try {
 }
 ```
 
-The session file is plain JSON:
-
-```json
-{ "version": 1, "createdAt": "2026-10-30T19:23:25.983Z", "url": "https://ops.internal.example.com/dashboard",
-  "cookies": { "sid": "â€¦" }, "localStorage": {}, "sessionStorage": {} }
-```
+The session file is plain JSON with the page URL, the cookies, and `localStorage`/`sessionStorage`. Besides the `cookies` name/value map, it has a `cookieList` that keeps each cookie's domain, path, `Secure` flag and expiry. Session files written by older versions have only the `cookies` map; those cookies are applied to the site in the file's `url`.
 
 **Production notes.**
 
 - **The session file is a credential.** Store it outside the repo (add `.secrets/` to `.gitignore`), make it readable only by the service account, or keep it in a secret store and write it to a temp file at start-up.
-- Credentials come from the environment or a secret manager, never from an LLM tool call. If an LLM drives later steps, note that typed values appear in snapshots (recipe 1).
+- Credentials come from the environment or a secret manager, never from an LLM tool call. If an LLM drives later steps, typed values show as `[FILLED]` in snapshots and passwords are never included (recipe 1).
 - Check `result.skipped`: when the login form changes, a field that isn't found is reported there instead of throwing.
-
-> **Known issue (0.1.0):** The cookie jar ignores domain and path. Every stored cookie is sent to every host the page requests, including third-party scripts and redirects to other domains. Each page has its own jar, so use a separate page (`browser.newPage()`) per site, and never load a session file for one site into a page that visits others.
-
-> **Known issue (0.1.0):** `localStorage`/`sessionStorage` are reset on every navigation in the native engine. Restoring a session therefore only helps **cookie-based** logins. A token kept in `localStorage` is gone after the next `goto()`.
+- Cookies are scoped like in a browser (host-only or `Domain=`, path, `Secure`, expiry), so a restored session cookie is sent only to the site that set it, not to third-party scripts or other domains.
+- `localStorage` and `sessionStorage` persist across navigations within an origin, so apps that keep their auth token in `localStorage` also work with a restored session.
 
 ---
 
@@ -723,12 +674,12 @@ The session file is plain JSON:
 
 **Why Orbis fits.** `selectOption()` picks options by value or visible text and fires `input`/`change`, so the page's `onchange` handler runs. `diff()` shows the newly revealed dropdown. `fillForm({ steps })` chains "fill, click Next, fill, click Finish" in one call.
 
-**When it doesn't fit.** Wizards built on custom JavaScript widgets that need layout or CSSOM (`element.style`, `getComputedStyle`), `XMLHttpRequest` or framework internals. Check `page.getLogs()` for errors first.
+**When it doesn't fit.** Wizards built on custom JavaScript widgets that need real layout, iframes, custom elements or other browser APIs Orbis lacks (see [limitations.md](limitations.md)). Check `page.getLogs()` for errors first.
 
 **Verified.** Run against a fixture wizard. The State dropdown appeared after choosing India, both steps were filled, and the final GET submission was `?fullName=Priya+Sharma&country=IN&state=MH&company=Acme+Ltd&terms=on`.
 
 ```ts
-// register-wizard.ts â€” dependent dropdowns + a two-step form
+// register-wizard.ts — dependent dropdowns + a two-step form
 import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const URL_ = process.env.WIZARD_URL ?? 'https://portal.example.com/wizard';
@@ -738,18 +689,14 @@ const agent = new OrbisAgent(browser, browser.newPage());
 try {
   await agent.goto(URL_); // also records the baseline snapshot for diff()
 
-  // 1. Pick the parent value; the page's onchange handler builds the dependent <select>.
-  //    0.1.0 workaround: page scripts read select.value from the value attribute, so set it first.
-  const country = agent.page.resolveElement('label:Country');
-  if (!country) throw new Error('Country field not found');
-  country.value = 'IN';
+  // 1. Pick the parent value; the page's onchange handler reads this.value and builds the dependent <select>
   if (!agent.selectOption('label:Country', 'India')) throw new Error('Country option not found');
   const delta = agent.diff();
-  console.log(delta.summary); // shows the State <select> appearing and Country's mutation
+  console.log(delta.summary); // shows the State <select> appearing
 
   // 2. The dependent dropdown now exists; target it by label, not by @ID
   if (!agent.selectOption('label:State', 'Maharashtra')) {
-    // Usually a page-script failure: Orbis has no layout/CSSOM APIs (see limitations.md)
+    // Usually a page-script failure, e.g. an API Orbis lacks (see limitations.md)
     console.error(agent.page.getLogs());
     throw new Error('State option not found');
   }
@@ -775,9 +722,7 @@ try {
 
 Added (1 elements):
   + [@3] [select] "DelhiMaharashtra" (selector: #state)
-
-Mutated (1 elements):
-  * [@2] [select] "IN" (text: "-- Choose --IndiaUnited States" -> "IN", value: undefined -> "IN")
+...
 {
   filled: [ 'label:Full name', 'label:Company', '#terms' ],
   skipped: [],
@@ -786,14 +731,14 @@ Mutated (1 elements):
 }
 ```
 
-> **Known issue (0.1.0):** In page JavaScript, `select.value` reads the `<select>`'s `value` attribute, not the selected option. `selectOption()` marks the option as selected and fires `change`, but a handler doing `update(this.value)` receives `''`. The sample works around this by setting the attribute first (`country.value = 'IN'`). Alternatives: call the page's own function with `page.evaluate("updateStates('IN')")`, or submit the step and read the server-rendered next page. Native form submission always sends the selected option correctly.
+In page JavaScript, `select.value`, `selectedIndex`, `options` and each option's `text`, `label` and `index` reflect the selected option, so `onchange` handlers that read `this.value` get the value `selectOption()` picked. Page scripts can also use `element.style`, `dataset`, `innerText` and `getComputedStyle`, so a handler that shows the next field with `box.style.display = 'block'` works. If expected fields never appear, `page.getLogs()` shows the script error.
 
-> **Known issue (0.1.0):** Elements have no `style`, `dataset` or `innerText` properties for page scripts on the SDK, MCP-native and WebDriver paths, so a handler such as `box.style.display = 'block'` throws. If expected fields never appear, `page.getLogs()` shows the error. The fixture in this recipe toggles visibility with the `hidden` attribute.
+> **Changed in 0.2.0:** `agent.fillForm(fields)` no longer submits by default. Pass `true` or a submit target (`agent.fillForm(fields, 'text=Save')`) to submit. Python's `fill_form(fields, submit=False)` and the REST and LangChain form tools also default to not submitting.
 
 **Production notes.**
 
 - Target dependent fields by label (`label:State`), not by `@ID`. IDs are renumbered whenever elements appear or disappear.
-- `page.fillForm()` only submits when you pass `submit`. `agent.fillForm(fields)` submits **by default** (its second argument defaults to `true`).
+- `page.fillForm()` and `agent.fillForm()` only submit when you pass a submit target (or `true` for `agent.fillForm`).
 - For a `<select>`, `fillForm` matches an option by exact `value` or exact text. `selectOption` also accepts a substring of the text.
 - Checkboxes and radios take `'true' | '1' | 'yes' | 'checked' | 'on'` to check. Any other value unchecks.
 
@@ -890,7 +835,7 @@ jobs:
 
 **Production notes.**
 
-- `GET /status` returns `{"value":{"ready":true,â€¦}}` while there's session capacity left. Use it as the readiness check.
+- `GET /status` returns `{"value":{"ready":true,…}}` while there's session capacity left. Use it as the readiness check.
 - Idle sessions are reaped after 5 minutes. A test that crashes before `quit()` holds a slot until then.
 - `driver.get_screenshot_as_png()` succeeds but returns a placeholder image. Don't attach it to failure reports. Attach `driver.page_source` instead.
 - `acceptInsecureCerts: true` in the capabilities skips TLS verification for self-signed staging certificates. Never use it against production.
@@ -904,12 +849,12 @@ jobs:
 
 **Why Orbis fits.** `chromium.connectOverCDP()` against the Orbis daemon keeps the script nearly unchanged. `goto`, `getByLabel().fill()`, `getByRole().click()`, `waitForURL` and `locator().allTextContents()` all worked in our test.
 
-**When it doesn't fit.** Scripts that rely on screenshots, PDFs, request interception, downloads, iframes, or the visual state of the page.
+**When it doesn't fit.** Scripts that rely on screenshots, PDFs, downloads, iframes, or the visual state of the page.
 
-**Verified.** The script below was run against a daemon (`orbis --port â€¦ --host 127.0.0.1`) and a fixture app. It printed `{ heading: 'Ops dashboard', values: [ '42', '99.2%' ] }`.
+**Verified.** The script below was run against a daemon (`orbis --port … --host 127.0.0.1`) and a fixture app. It printed `{ heading: 'Ops dashboard', values: [ '42', '99.2%' ] }`.
 
 ```ts
-// scrape-dashboard.playwright.ts â€” an existing Playwright script, now pointed at Orbis
+// scrape-dashboard.playwright.ts — an existing Playwright script, now pointed at Orbis
 import { chromium } from 'playwright';
 
 const APP = process.env.APP_URL ?? 'https://ops.internal.example.com';
@@ -941,21 +886,21 @@ Start the daemon next to the job:
 ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/memora-orbis --port 9222 --host 127.0.0.1
 ```
 
-**What to watch for (all observed on 0.1.0).**
+**What to watch for.**
 
 | Playwright feature | Behaviour on Orbis |
 | :--- | :--- |
-| `page.route()` / request interception | Registers without error but the handler is **never called** |
-| `context.cookies()` | Returned `[]` even though the session cookie was being sent |
-| `page.on('console')` | No console events are forwarded |
-| `page.screenshot()` | Returns a 1Ã—1 placeholder PNG (68 bytes) |
-| `page.selectOption()` | Failed with `TypeError: Cannot read properties of undefined (reading 'replace')`. Use the Orbis SDK's `selectOption()` for select-heavy flows |
-| Page JS using `element.style` | Works over CDP (a DOM compatibility layer is installed when a CDP client attaches), unlike the native SDK path |
+| `page.route()` / request interception | Works: `fulfill`, `continue` and `abort` apply to navigations, scripts and page `fetch`/XHR |
+| `page.on('console')` | Console events are forwarded |
+| `page.selectOption()` | Works |
+| `context.newCDPSession(page)` | Works |
+| `context.cookies()`, `addCookies()`, `clearCookies()` | Work |
+| `page.screenshot()` | Returns a 1×1 placeholder PNG (68 bytes) |
 
 **Production notes.**
 
-- Run **one daemon per worker** and don't share a daemon between unrelated jobs. All CDP clients of a daemon share its page list and connection pool, and any client can read or close another client's pages.
-- The daemon listens on all interfaces even with `--host 127.0.0.1` or `localhost`, and doesn't enforce an API key in 0.1.0. Firewall the port or isolate it in a container network (see [security.md](security.md) and [production-deployment.md](production-deployment.md)).
+- Run **one daemon per worker** and don't share a daemon between unrelated jobs. All CDP clients of a daemon share its page list and connection pool, and any client can read another client's pages. `Browser.close` closes only the pages that client created.
+- With `--host localhost` (the default) or `127.0.0.1`, the daemon binds to 127.0.0.1 only. Pass `--host 0.0.0.0` only when other machines or containers must reach it, and then set `ORBIS_API_KEY` so every request needs the key (see [security.md](security.md) and [production-deployment.md](production-deployment.md)).
 - Measure on your own pages before planning capacity. The only published comparison is a local test set (see [limitations.md](limitations.md) and [playwright-puppeteer.md](playwright-puppeteer.md)).
 
 ---
@@ -964,11 +909,11 @@ ORBIS_NO_TELEMETRY=1 npx -y @memoracompany/memora-orbis --port 9222 --host 127.0
 
 **Problem.** You want Claude Code, Claude Desktop or Cursor to read your local dev server, documentation and issue pages while you code, and to click through flows in your app.
 
-**Why Orbis fits.** `orbis --mcp` is a stdio MCP server with 15 tools (`memora_browse`, `memora_act`, `memora_fill_form`, `memora_diff`, `memora_extract`, â€¦). Pages come back as action maps plus Markdown instead of raw HTML.
+**Why Orbis fits.** `orbis --mcp` is a stdio MCP server with 17 tools (`memora_browse`, `memora_act`, `memora_fill_form`, `memora_diff`, `memora_extract`, `memora_firewall`, …). Pages come back as action maps plus Markdown instead of raw HTML.
 
 **When it doesn't fit.** Inspecting visual layout and CSS issues, or a client-rendered dev server on the native engine. Use `--engine chrome` for SPAs.
 
-**Verified.** The tool list (15 tools) was confirmed with `initialize` + `tools/list` against the 0.1.0 build. The client configurations below weren't tested in each client.
+**Verified.** The tool list was confirmed with `initialize` + `tools/list` (15 tools on the 0.1.0 build; `memora_handoff` was added in 0.1.2 and `memora_firewall` in 0.2.0). The client configurations below weren't tested in each client.
 
 Claude Code:
 
@@ -1006,9 +951,9 @@ Example prompts:
 
 **Production notes.**
 
-- Always set `ORBIS_NO_TELEMETRY=1`. At start-up the CLI checks for updates, and an update notice is printed to **stdout**, the same stream the MCP protocol uses.
-- `memora_eval` runs arbitrary JavaScript and `memora_session` reads and writes files on your machine. Approve those tool calls deliberately.
-- Clients must wait for each tool result before sending the next call. Requests aren't serialised, and concurrent calls (for example a browse and an act) can race.
+- The configs above set `ORBIS_NO_TELEMETRY=1`. The start-up update notice goes to stderr, so it doesn't interfere with the MCP protocol on stdout.
+- `memora_eval` runs arbitrary JavaScript, so approve those calls deliberately. `memora_session` only reads and writes `.json` files inside the server's start folder or `ORBIS_SESSION_DIR`.
+- Tool calls run one at a time in the order they arrive, so a browse and an act sent together don't race.
 - `memora_fork` switches the active page to the clone. There is no tool to switch back.
 - Full tool reference: [mcp.md](mcp.md).
 
@@ -1020,17 +965,17 @@ Example prompts:
 
 **Why Orbis fits.** `obeyRobots` checks every request against the origin's robots.txt (RFC 9309), including redirect hops, page `fetch()` calls and script downloads. Rules are cached per origin for 24 hours and fetched once even when requests run concurrently.
 
-**When it doesn't fit.** Large-scale crawling that needs politeness scheduling across many hosts, `Crawl-delay` support, sitemap discovery or deduplication. Use a crawler framework and Orbis as the page processor.
+**When it doesn't fit.** Large-scale crawling that needs politeness scheduling across many hosts, sitemap discovery or deduplication. Use a crawler framework and Orbis as the page processor.
 
 **Verified.** Run against a fixture whose robots.txt disallows `/private` for `AcmeResearchBot` and everything for `*`. The crawl fetched 2 pages and reported `/private/x` as blocked. With the default agent token (`MemoraBrowser`), the first request failed with `RobotsBlockedError` (`code: 'ERR_BLOCKED_BY_ROBOTS'`).
 
 ```ts
-// polite-crawler.ts â€” same-origin crawl that honours robots.txt and rate limits itself
+// polite-crawler.ts — same-origin crawl that honours robots.txt and rate limits itself
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const START = process.env.START_URL ?? 'https://docs.example.com/guide';
 const MAX_PAGES = Number(process.env.MAX_PAGES ?? 200);
-const DELAY_MS = Number(process.env.DELAY_MS ?? 2000); // Orbis ignores Crawl-delay; enforce your own
+const DELAY_MS = Number(process.env.DELAY_MS ?? 2000); // your own floor; Orbis also honours Crawl-delay
 
 const browser = new OrbisBrowser({
   network: {
@@ -1090,7 +1035,7 @@ The same rules from the CLI:
 npx -y @memoracompany/memora-orbis fetch https://docs.example.com/private/x \
   --obey-robots --robots-agent AcmeResearchBot \
   --user-agent "AcmeResearchBot/1.0 (+https://acme.example/bot)"
-# stderr: Fetch error: Blocked by robots.txt: â€¦ ; exit code 1
+# stderr: Fetch error: Blocked by robots.txt: … ; exit code 1
 ```
 
 **How the robots rules behave.**
@@ -1104,8 +1049,8 @@ npx -y @memoracompany/memora-orbis fetch https://docs.example.com/private/x \
 **Production notes.**
 
 - `robotsAgent` selects the robots group and `userAgent` is what the server sees. Set both to the same product name. The CLI only accepts letters, `_` and `-` in `--robots-agent` (`"Acme Bot"` is rejected).
-- `Crawl-delay` and `Sitemap` lines are ignored. Enforce your own per-host delay as the sample does.
-- Every blocked request writes a line to stderr (`[Memora] blocked by robots.txt: â€¦`). Expect that noise in your logs.
+- With robots checking on, `Crawl-delay` is honoured (capped at 60 seconds). `Sitemap` lines are ignored. Keep a per-host delay of your own for sites that don't set `Crawl-delay`, as the sample does.
+- Every blocked request writes a line to stderr (`[Memora] blocked by robots.txt: …`). Expect that noise in your logs.
 - Stop on 429 and 503 responses and respect `Retry-After`. Robots compliance alone doesn't make a crawl polite.
 
 ---
@@ -1121,7 +1066,7 @@ npx -y @memoracompany/memora-orbis fetch https://docs.example.com/private/x \
 **Verified.** Run against a fixture search page. Three branches submitted different category and sort filters at the same time and returned `12`, `7` and `30` results. The original page stayed on `?q=kettle`.
 
 ```ts
-// explore-filters.ts â€” try several filter combinations from one loaded state
+// explore-filters.ts — try several filter combinations from one loaded state
 import { OrbisAgent, OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const SEARCH_URL = process.env.SEARCH_URL ?? 'https://catalog.example.com/search?q=kettle';
@@ -1144,7 +1089,7 @@ try {
       const res = await branch.fillForm(fields, 'text=Search');
       return { fields, url: res.url, count: branch.page.extract('#count', 'text', 1)[0] };
     } finally {
-      branch.page.close(); // close only the branch page â€” NOT branch.close() (see Known issue)
+      await branch.close(); // closes only the fork; the original agent keeps working
     }
   }));
 
@@ -1158,24 +1103,22 @@ try {
 **Expected output.**
 
 ```text
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚ (index) â”‚ fields                                    â”‚ url                                                         â”‚ count                                               â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ 0       â”‚ { '#cat': 'books', '#sort': 'price' }     â”‚ 'https://catalog.example.com/search?q=kettle&cat=books&â€¦'   â”‚ '12 results for kettle in books sorted by price'    â”‚
-â”‚ 1       â”‚ { '#cat': 'tools', '#sort': 'relevance' } â”‚ 'https://catalog.example.com/search?q=kettle&cat=tools&â€¦'   â”‚ '7 results for kettle in tools sorted by relevance' â”‚
-â”‚ 2       â”‚ { '#cat': 'all', '#sort': 'price' }       â”‚ 'https://catalog.example.com/search?q=kettle&cat=all&â€¦'     â”‚ '30 results for kettle in all sorted by price'      â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌─────────┬───────────────────────────────────────────┬─────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────┐
+│ (index) │ fields                                    │ url                                                         │ count                                               │
+├─────────┼───────────────────────────────────────────┼─────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────┤
+│ 0       │ { '#cat': 'books', '#sort': 'price' }     │ 'https://catalog.example.com/search?q=kettle&cat=books&…'   │ '12 results for kettle in books sorted by price'    │
+│ 1       │ { '#cat': 'tools', '#sort': 'relevance' } │ 'https://catalog.example.com/search?q=kettle&cat=tools&…'   │ '7 results for kettle in tools sorted by relevance' │
+│ 2       │ { '#cat': 'all', '#sort': 'price' }       │ 'https://catalog.example.com/search?q=kettle&cat=all&…'     │ '30 results for kettle in all sorted by price'      │
+└─────────┴───────────────────────────────────────────┴─────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────┘
 original page untouched: https://catalog.example.com/search?q=kettle
 ```
-
-> **Known issue (0.1.0):** `fork.close()` closes the **parent's** browser and its connection pool. Afterwards the original agent fails with `The client is closed`. Dispose of branches with `fork.page.close()`, as the sample does.
 
 **Production notes.**
 
 - Design branches around native links (`page.activate()` on `<a href>`), GET/POST form submissions (`fillForm` with `submit`) and reading or extracting. Don't rely on script-attached click handlers.
 - Inline `<script>`s run again in the fork when the HTML is re-parsed. Scripts with side effects (analytics beacons, counters) run once more per branch.
 - Forked pages aren't registered with the browser, so they don't appear in `listPages()` or to CDP clients.
-- Cap parallelism (for example 3â€“5 branches per site) for the same politeness reasons as crawling.
+- Cap parallelism (for example 3–5 branches per site) for the same politeness reasons as crawling.
 
 ---
 
@@ -1190,7 +1133,7 @@ original page untouched: https://catalog.example.com/search?q=kettle
 **Verified.** Run against a fixture company site. It found the contact page (the 404 `/about` link was skipped), `sales@acme.test` and `press@acme.test`, and `+1-555-0100`.
 
 ```ts
-// company-contacts.ts â€” find published business contact channels on company websites
+// company-contacts.ts — find published business contact channels on company websites
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const SITES = (process.env.SITES ?? 'https://acme.example').split(',');
@@ -1273,7 +1216,7 @@ console.log(JSON.stringify(out, null, 2));
 **Verified.** Run against fixtures. A healthy page exited 0 (`OK: 2 components operational`). A 503 page with one outage printed both messages and exited 2. An unreachable host exited 2.
 
 ```ts
-// status-check.ts â€” exit 0 = healthy, 1 = degraded component, 2 = page unreachable / HTTP error
+// status-check.ts — exit 0 = healthy, 1 = degraded component, 2 = page unreachable / HTTP error
 import { OrbisBrowser } from '@memoracompany/memora-orbis';
 
 const STATUS_URL = process.env.STATUS_URL ?? 'https://status.internal.example.com/';
@@ -1287,11 +1230,11 @@ try {
     console.error(`UNREACHABLE: HTTP ${status} from ${STATUS_URL}`);
     code = 2;
   }
-  // Read whatever the page renders even on 5xx â€” many status pages still list components
+  // Read whatever the page renders even on 5xx — many status pages still list components
   const names: string[] = page.extract('.component', 'text');
   const states: string[] = page.extract('.component', 'data-state');
   const broken = names.filter((_, i) => states[i] !== 'operational');
-  if (names.length === 0) { console.error('No components found â€” has the page markup changed?'); code = Math.max(code, 2); }
+  if (names.length === 0) { console.error('No components found — has the page markup changed?'); code = Math.max(code, 2); }
   else if (broken.length) { console.error(`DEGRADED: ${broken.join('; ')}`); code = Math.max(code, 1); }
   else console.log(`OK: ${names.length} components operational`);
 } catch (err: any) {
@@ -1319,7 +1262,7 @@ Crontab (Linux), with a lock and a hard timeout:
 
 **Production notes.**
 
-- Don't use `orbis --eval` for monitoring: it exits 0 even when the fetch fails. `orbis fetch` exits 1 only on network, TLS or robots errors and **exits 0 on HTTP 4xx/5xx**. The SDK gives you the status code (`goto()` returns `{ status }`, and `page.lastStatus` holds it too).
+- For a plain up/down check, `orbis fetch` and `orbis --eval` exit 1 on load failures and on HTTP 4xx/5xx (`fetch` still prints the page and writes `HTTP <status> from <url>` to stderr). Use the SDK, as here, when you also need to read the page: `goto()` returns `{ status }`, and `page.lastStatus` holds it too.
 - Set both the navigation timeout (`timeoutMs`) and an outer `timeout` in cron. TCP connect attempts have their own 10-second limit in the HTTP client.
 - Alert on consecutive failures (for example 2 of the last 3 runs) to avoid flapping.
 

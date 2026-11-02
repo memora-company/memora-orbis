@@ -1,13 +1,13 @@
 # Security Guide
 
-This guide describes the security properties of Orbis 0.1.0 as verified against its source code and at runtime, the threats that matter in production, and how to harden a deployment. Orbis loads untrusted web content, executes its JavaScript, and exposes powerful remote-control interfaces (CDP, REST, WebDriver, MCP). Treat every Orbis process as **a component that can be fully controlled by both the websites it visits and anyone who can reach its port**, and isolate it accordingly.
+This guide describes the security properties of Orbis, the threats that matter in production, and how to harden a deployment. Orbis loads untrusted web content, executes its JavaScript, and exposes powerful remote-control interfaces (CDP, REST, WebDriver, MCP). Treat every Orbis process as **a component that websites and anyone who can reach its port will try to control**, and isolate it accordingly.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
 - [1. Threat model](#1-threat-model)
-- [2. Verified security properties of 0.1.0](#2-verified-security-properties-of-010)
+- [2. Security properties](#2-security-properties)
 - [3. Network isolation](#3-network-isolation)
 - [4. Process and tenant isolation](#4-process-and-tenant-isolation)
 - [5. Reverse proxy examples](#5-reverse-proxy-examples)
@@ -18,86 +18,97 @@ Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on
 - [10. Hardening checklist](#10-hardening-checklist)
 - [11. Reporting vulnerabilities](#11-reporting-vulnerabilities)
 
+> **Prompt injection:** web pages can try to give your agent instructions. The 0.2.0 [prompt injection firewall](./prompt-injection-firewall.md) adds approvals for risky actions, site allow and block lists, and a signed activity log.
+
 ---
 
 ## 1. Threat model
 
-| Actor | What they can do in 0.1.0 if not mitigated |
+| Actor | What they can do if not mitigated |
 | :--- | :--- |
-| **Anyone who can reach the CDP/REST port** | Navigate pages, read page content and cookies, run JavaScript in any page, read and write files through the session endpoints, and close every page |
-| **Anyone who can reach the WebDriver port** | Create sessions (up to `--max-sessions`), navigate, run scripts, read cookies |
-| **A website the agent visits** | Run JavaScript that reaches the host Node.js process. That is code execution with the privileges of the Orbis process (see [2.6](#26-page-javascript-is-not-sandboxed)). It also receives cookies that other sites set in the same page (see [2.5](#25-cookies-are-not-scoped-to-a-site)). |
-| **A prompt-injected LLM** (via page content) | Ask the agent to visit attacker URLs, submit forms, exfiltrate data through query strings, call `memora_eval`, or save/load session files at arbitrary paths |
-| **Whoever can read your logs or prompts** | See typed values (passwords, OTPs) that appear in action maps and diffs (see [section 7](#7-keeping-secrets-away-from-the-llm)) |
+| **Anyone who can reach the CDP/REST port** (and has the API key, if one is set) | Navigate pages, read page content and cookies, run JavaScript in any page, save and load session files in the server's session folder, and close pages |
+| **Anyone who can reach the WebDriver port** (and has the API key, if one is set) | Create sessions (up to `--max-sessions`), navigate, run scripts, read cookies |
+| **A website the agent visits** | Run JavaScript in the page. Orbis blocks the known ways for page scripts to reach the host Node.js process, but the page runtime is not a perfect sandbox (see [2.6](#26-page-javascript-runs-in-a-hardened-sandbox)). |
+| **A prompt-injected LLM** (via page content) | Ask the agent to visit attacker URLs, submit forms, exfiltrate data through query strings, call `memora_eval`, or save/load session files |
+| **Whoever can read your logs or prompts** | See page content and anything a page script copied from typed values. Typed values themselves are hidden in action maps and diffs (see [section 7](#7-keeping-secrets-away-from-the-llm)). |
 
-Design principle: **the Orbis process is untrusted.** Give it nothing it does not need: no cloud credentials, no access to internal admin networks, no writable application directories, no shared tenancy.
+Design principle: **treat the Orbis process as exposed to hostile content.** Give it nothing it does not need: no cloud credentials, no access to internal admin networks, no writable application directories, no shared tenancy.
 
-## 2. Verified security properties of 0.1.0
+## 2. Security properties
 
-Each item below was confirmed by reading `memora-browser/src` and, where marked, by running the 0.1.0 build.
+### 2.1 Bind address
 
-### 2.1 The server listens on all interfaces by default
+The CDP/REST server and the WebDriver server listen on `127.0.0.1` only when `--host` is `localhost` (the default) or `127.0.0.1`. Other machines and containers cannot connect.
 
-The CDP/REST server and the WebDriver server both replace `localhost` and `127.0.0.1` with `0.0.0.0` before listening. **Verified at runtime:** `OrbisAgent.launch()` with the default host reported bind address `0.0.0.0`. The default `orbis --port 9222` is therefore reachable from any network the machine is attached to.
+- To accept connections from other machines (for example in Docker or Kubernetes), pass `--host 0.0.0.0`, or a specific private IP such as `--host 10.0.0.5`.
+- `--host ::1` listens on the IPv6 loopback; printed URLs show `[::1]`.
 
-> **Known issue (0.1.0):** `--host localhost` and `--host 127.0.0.1` bind `0.0.0.0`. Workarounds:
-> - Bind a specific private IP (`--host 10.0.0.5`).
-> - Bind the alternative loopback address `--host 127.0.0.2` (verified; on macOS run `sudo ifconfig lo0 alias 127.0.0.2` first).
-> - Run Orbis in a container whose port is not published.
->
-> Do **not** use an IPv6 literal such as `--host ::1`. The process crashes on the first request.
+> **Changed in 0.2.0:** earlier versions listened on all interfaces (`0.0.0.0`) for `--host localhost` and `--host 127.0.0.1`. If you relied on that to reach a daemon from another machine or container, pass `--host 0.0.0.0` explicitly.
 
-### 2.2 API keys are not enforced
+### 2.2 API keys
 
-`OrbisAgent.launch({ apiKey })`, `ORBIS_API_KEY` and `MEMORA_API_KEY` are stored, and the TypeScript and Python clients send them as `x-api-key` and `Authorization: Bearer` headers. The server contains an authorization routine, but nothing calls it. **Verified at runtime:** with an API key configured, an unauthenticated `GET /json/version` returned HTTP 200, and so did the agent endpoints.
+When `ORBIS_API_KEY` (or `MEMORA_API_KEY`, or the `apiKey` option of `OrbisAgent.launch()`) is set, the CDP/REST server requires it on **every** HTTP request and every CDP WebSocket connection, sent in one of these ways:
 
-> **Known issue (0.1.0):** the API key provides no protection. Enforce authentication in a reverse proxy ([section 5](#5-reverse-proxy-examples)) or rely purely on network isolation.
+- `x-api-key: <key>` header,
+- `Authorization: Bearer <key>` header,
+- `?apiKey=<key>` query parameter.
 
-### 2.3 CORS allows every origin
+Requests without the right key get HTTP `401`. The TypeScript and Python clients send the key automatically when you configure it. Health checks (`/json/version`) must send it too.
 
-HTTP responses carry `Access-Control-Allow-Origin: *`. Any web page open in a developer's normal browser can call `http://localhost:9222/orbis/...` from JavaScript. Through the session endpoints it can then read cookies or files. Developers running a daemon locally are exposed to this while they browse.
+The WebDriver server (`orbis serve --protocol webdriver`) checks the same key on every request, including `/status`. Besides the three ways above it also accepts `Authorization: Basic` with the key as the password (any user name), which is what Selenium sends when the key is in the server URL:
+
+```python
+driver = webdriver.Remote(command_executor=f"http://orbis:{key}@127.0.0.1:9515", options=options)
+```
+
+A missing or wrong key gets HTTP `401`. See [selenium-webdriver.md](./selenium-webdriver.md#api-key).
+
+Set a key whenever anything other than your own process can reach the port, and still keep the port on a private network.
+
+> **Changed in 0.2.0:** earlier versions stored the key but did not check it, and the WebDriver server had no authentication at all. If you set `ORBIS_API_KEY` for a WebDriver server, every Selenium client and health check must now send the key.
+
+### 2.3 Requests from web pages are refused
+
+The CDP/REST server does not send CORS headers, and it refuses requests that a web page in someone's browser makes to it (cross-site requests) with HTTP `403` and the code `ERR_FORBIDDEN_ORIGIN`. A website open in a developer's normal browser therefore cannot drive a local daemon. The WebDriver server also refuses cross-site requests with HTTP `403`.
+
+REST endpoints called with the wrong HTTP method answer `405` with an `Allow` header listing the accepted methods, and the body `{"error":"Method not allowed","code":"ERR_METHOD_NOT_ALLOWED"}`.
+
+> **Changed in 0.2.0:** earlier versions answered with `Access-Control-Allow-Origin: *`.
+
+### 2.4 Session file paths are restricted
+
+| Interface | Behaviour |
+| :--- | :--- |
+| `POST /orbis/session` with `{"filePath": "..."}` (also `/memora/session`) | Reads only `.json` files inside the folder the server was started in, or inside `ORBIS_SESSION_DIR` if set. Anything else is refused with HTTP `403` (`ERR_SESSION_PATH`). |
+| `POST /orbis/session/save` with `{"filePath": "..."}` (also `/memora/session/save`) | Writes only `.json` files inside the same folder, creating sub-folders as needed. Existing session files there can be overwritten. |
+| MCP `memora_session` | Same restriction; other paths return a tool error |
+| CDP `Orbis.saveSession` / `Orbis.loadSession` with `filePath` (also `Memora.*`, `LP.*`) | Same restriction: only `.json` files inside the session folder. Other paths return a CDP error. |
+| TypeScript SDK `saveSession()` / `loadSession()` in your own code | Not restricted; your code chooses the path |
 
 Mitigations:
-- Prefer MCP (stdio) or the in-process SDK on workstations.
-- Stop daemons when they are not in use.
-- Never keep real credentials in a local daemon's session.
+- Start the server in a dedicated folder, or set `ORBIS_SESSION_DIR` to one.
+- Run as an unprivileged user, with a read-only root filesystem except the sessions folder.
+- In MCP setups, review tool calls that touch session files.
 
-### 2.4 Session endpoints read and write arbitrary paths
+### 2.5 Cookies are scoped to a site
 
-| Endpoint | Behaviour |
-| :--- | :--- |
-| `POST /orbis/session` with `{"filePath": "..."}` (also `/memora/session`) | Reads and parses **any path** the process can read. Parse errors are returned to the caller and can include a fragment of the file's content. |
-| `POST /orbis/session/save` with `{"filePath": "..."}` (also `/memora/session/save`) | Writes JSON to **any path** the process can write, creating directories as needed, and overwrites existing files |
-| CDP `Orbis.saveSession` / `Orbis.loadSession` (also `Memora.*`, `LP.*`) | Same behaviour over CDP |
-| MCP `memora_session` | Same behaviour, driven by the LLM's tool call |
+The native engine scopes cookies like a browser: by domain (host-only, or the domain and its subdomains when `Domain=` is set), path, `Secure` and expiry. A cookie set by one site is not sent to other sites, and a `Secure` cookie is not sent over plain HTTP.
 
-Mitigations:
-- Run as an unprivileged user.
-- Use a read-only root filesystem with a single writable sessions directory.
-- Block these paths at the gateway.
-- In MCP setups, review tool calls that touch paths.
+Each page (and each context created with `newContext()`) has its own cookie jar. Keeping one page or context per credential set is still good practice, so that an agent browsing other sites cannot act on an authenticated session.
 
-### 2.5 Cookies are not scoped to a site
+> **Changed in 0.2.0:** earlier versions sent every cookie to every host. Session files now also contain a `cookieList` with each cookie's site; older files are still accepted (see [sessions-and-auth.md](./sessions-and-auth.md)).
 
-The native engine stores cookies as a single `name â†’ value` map per page. It ignores `Domain`, `Path`, `Secure`, `HttpOnly`, `SameSite` and expiry dates; only `Max-Age=0` and pre-1980 `Expires` delete a cookie. Every stored cookie is sent to **every** host the page requests, including subresources and page `fetch()` calls. **Verified at runtime:** a cookie set by `http://127.0.0.1:18081/set` was sent to `http://localhost:18081/echo`.
+### 2.6 Page JavaScript runs in a hardened sandbox
 
-Consequences:
-- After logging in to site A, any later navigation, script or `fetch()` to site B leaks A's session cookie to B.
-- Cookies with the same name from two sites overwrite each other.
-- A cookie marked `Secure` is also sent over plain HTTP.
+Pages execute inside Node.js `node:vm` contexts. Orbis blocks the known ways for page JavaScript to reach the host Node.js process: for example, `document.constructor.constructor('return process')()` throws an `EvalError`, and module imports with a computed path are refused.
 
-> **Known issue (0.1.0):** never visit untrusted or third-party URLs in a page or browser that holds authentication cookies. Use one page (or one `OrbisBrowser`) per site and per credential set. The Chrome engine (MCP `--engine chrome`) uses Chrome's normal cookie scoping.
+This is hardening, not a perfect sandbox. The Node.js documentation states that `node:vm` is not a security mechanism. For high-assurance setups:
 
-### 2.6 Page JavaScript is not sandboxed
+- Run Orbis in a dedicated container or VM, as an unprivileged user, with no secrets in its environment and no access to internal networks it does not need.
+- Avoid embedding the in-process SDK (`OrbisBrowser` / `OrbisAgent.launch()`) in a service that holds credentials when it visits untrusted URLs.
+- Prefer a separate daemon process per trust domain.
 
-Pages execute inside Node.js `node:vm` contexts. The Node.js documentation states that `node:vm` is not a security mechanism. **Verified at runtime:** a page `<script>` obtained the host `process` object through the constructor of a host-provided function, including `process.getBuiltinModule`. Any website loaded by the native engine can therefore read and write files, open network connections, read environment variables (including secrets) and start processes with the privileges of the Orbis process.
-
-> **Known issue (0.1.0):** treat visiting a URL as running that site's code on your host. Required mitigations:
-> - Run Orbis in a dedicated container or VM, as an unprivileged user, with no secrets in its environment and no access to internal networks it does not need.
-> - Do not embed the in-process SDK (`OrbisBrowser` / `OrbisAgent.launch()`) in a service that holds credentials, unless every URL it visits is trusted.
-> - Prefer a separate daemon process per trust domain.
-
-The same applies to code you run deliberately: `page.evaluate()`, CDP `Runtime.evaluate`/`callFunctionOn`, WebDriver `execute_script` and MCP `memora_eval` all run with host reach. Expose them only to trusted callers.
+Code you run deliberately is different: `page.evaluate()`, CDP `Runtime.evaluate`/`callFunctionOn`, WebDriver `execute_script` and MCP `memora_eval` run whatever the caller sends. Expose them only to trusted callers.
 
 ### 2.7 Other properties
 
@@ -105,7 +116,7 @@ The same applies to code you run deliberately: `page.evaluate()`, CDP `Runtime.e
 | :--- | :--- |
 | No request size limits | HTTP bodies are buffered fully in memory. Put a body-size limit in the gateway. |
 | No rate limiting | Add it at the gateway if the daemon is shared |
-| Browser-wide close | CDP `Browser.close` closes every page in the daemon |
+| Browser close | CDP `Browser.close` closes only the pages created by that client |
 | Logs | `DEBUG_CDP` / `DEBUG_WEBDRIVER` print request contents, which can include typed values |
 | Outbound call | A startup version check calls `orbis.memora.company` unless `ORBIS_NO_TELEMETRY=1` (see [production-deployment.md](./production-deployment.md#11-outbound-version-check-and-air-gapped-environments)) |
 
@@ -114,7 +125,7 @@ The same applies to code you run deliberately: `page.evaluate()`, CDP `Runtime.e
 Use the strongest of these that fits your topology:
 
 1. **No listener at all.** Use `new OrbisBrowser()` + `newPage()` in-process (no port), or MCP over stdio.
-2. **Loopback only.** `--host 127.0.0.2` and connect to `http://127.0.0.2:<port>`. Alternatively, in Docker, publish with `-p 127.0.0.1:9222:9222`.
+2. **Loopback only.** The default (`--host localhost`) listens on `127.0.0.1` only. In Docker, where the container must listen on `0.0.0.0`, publish with `-p 127.0.0.1:9222:9222`.
 3. **Private network only.** Use one of these:
    - a container on an internal Docker network with no published ports,
    - a Kubernetes ClusterIP Service plus a NetworkPolicy,
@@ -138,8 +149,8 @@ Also restrict **egress** when agents should only reach approved sites. Use an eg
 
 ## 4. Process and tenant isolation
 
-- **One process per tenant or trust domain.** Pages in one process share the Node.js heap, and page scripts can reach the process (section 2.6).
-- **One page per site and per credential set**, because cookies are not scoped (section 2.5).
+- **One process per tenant or trust domain.** Pages in one process share the Node.js heap, and the page sandbox is hardened but not perfect (section 2.6).
+- **One page or context per credential set**, so that browsing other sites cannot act on an authenticated session (section 2.5).
 - **Python and REST clients share the daemon's default page.** Never let two users or two agents share one daemon.
 - **WebDriver sessions** have separate pages, but they still share one process. Do not mix tenants on one WebDriver daemon.
 - **Recycle processes** regularly (see [production-deployment.md](./production-deployment.md#8-graceful-shutdown-and-process-recycling)) so leaked state and memory do not accumulate.
@@ -180,7 +191,7 @@ server {
   allow 10.0.0.0/8;
   deny  all;
 
-  # Block arbitrary file read/write endpoints
+  # Block the session file endpoints
   location ~ ^/(orbis|memora)/session { return 403; }
 
   location / {
@@ -193,6 +204,8 @@ server {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
     proxy_set_header Authorization "";            # do not forward the gateway secret
+    # If Orbis runs with ORBIS_API_KEY, add it here (from another include):
+    # proxy_set_header x-api-key $orbis_api_key;
     proxy_read_timeout 300s;
   }
 }
@@ -211,36 +224,26 @@ Because `/json/version` advertises Orbis's internal address, CDP clients behind 
   - Never commit them. The repository `.gitignore` ignores `sessions/`.
   - Encrypt them at rest if they leave the host (for example, in your secret manager or an encrypted volume).
   - Rotate them. Delete files when the account password changes or the session is revoked.
-- **Do not put secrets in Orbis's environment** unless Orbis needs them. Hostile pages can read `process.env` (section 2.6).
+- **Do not put secrets in Orbis's environment** unless Orbis needs them. The page sandbox is hardened, not perfect (section 2.6), so keep what a sandbox escape could reach to a minimum.
 - **Inject credentials from your secret manager at call time** in your own code, not through prompts or configuration files committed to git.
-- **Custom headers** (`--http-header "Authorization: Bearer â€¦"`) are sent to **every** host the browser contacts, the same as cookies. Only use them when every URL in that process belongs to the same trusted service.
+- **Custom headers** (`--http-header "Authorization: Bearer …"`) are sent to **every** host the browser contacts (unlike cookies, which are scoped to their site). Only use them when every URL in that process belongs to the same trusted service.
 - **Test values only** in shared or staging environments.
 
 ## 7. Keeping secrets away from the LLM
 
-Values typed through `act()`, `type()`, `fillForm()`, REST `/orbis/act`, `/orbis/fill-form`, or MCP `memora_act`/`memora_fill_form` are written to the element's `value` attribute. As a result they appear:
+Values typed through `act()`, `type()`, `fillForm()`, REST `/orbis/act`, `/orbis/fill-form`, or MCP `memora_act`/`memora_fill_form` are not shown to the model in action maps and diffs:
 
-- in later snapshots' `actionMapText`, for example `[@2] [input] "Password" type="password" value="correct-horse" ...`,
-- in `diff().summary`, for example `* [@2] [input] "Password" (value: undefined -> "correct-horse")`,
-- in the Markdown or HTML returned by `memora_html`, `fetch --dump html`, and similar outputs.
+- in `actionMapText`, a filled text field shows `[FILLED]` instead of `value="..."`, password values are never included, and typed text never becomes a field's label;
+- in `diff().summary`, text fields show `[filled]` or `[empty]` instead of the typed text.
 
-If you send the action map or diff to a model, you send it the password, OTP or API key too.
+The values are still in the page itself, so outputs that return raw page content can include them: `memora_html`, `fetch --dump html`, `page.evaluate()` / `memora_eval`, and any text a page script copies elsewhere on the page.
+
+> **Changed in 0.2.0:** earlier versions showed typed values, including passwords, as `value="..."` in action maps and diffs.
 
 Mitigations:
 
-- Fill secrets **in code**, not via LLM tool calls. For example, run `fillForm({ '#password': secretFromVault }, false)` in your own code before handing control to the model.
-- **Redact before prompting.** For example, replace `value="..."` on `type="password"` entries:
-
-```ts
-const redact = (text: string) =>
-  text.replace(/(type="password"[^\n]*?) value="[^"]*"/g, '$1 value="[REDACTED]"')
-      .replace(/(value: )[^,)]*( -> )"[^"]*"/g, '$1[REDACTED]$2"[REDACTED]"');
-
-const snap = agent.snapshot();
-const safeForLlm = redact(snap.actionMapText);
-```
-
-  The second pattern redacts every value change in a diff summary. Apply it to diffs that may contain typed secrets.
+- Fill secrets **in code**, not via LLM tool calls. For example, run `fillForm({ '#password': secretFromVault })` in your own code before handing control to the model.
+- Do not send raw HTML or `memora_eval` results from pages that contain typed secrets to a model.
 - Prefer **restoring a saved session** (cookies) over typing credentials at all (see [sessions-and-auth.md](./sessions-and-auth.md)).
 - Do not log raw snapshots or diffs from authenticated flows.
 
@@ -263,9 +266,9 @@ Orbis sends Chrome-like request headers by default (see [stealth.md](./stealth.m
 
 Network
 - [ ] No Orbis port is reachable from the internet or from untrusted networks.
-- [ ] You don't depend on `--host localhost` / `127.0.0.1` for isolation; you use a specific IP, `127.0.0.2`, or an unpublished container port.
+- [ ] `--host 0.0.0.0` (or a specific IP) is only used where other hosts must connect, and then `ORBIS_API_KEY` is set.
 - [ ] A gateway with authentication, an IP allowlist and body-size limits fronts any shared daemon.
-- [ ] `/orbis/session*` and `/memora/session*` are blocked at the gateway.
+- [ ] Session files live in a dedicated folder (`ORBIS_SESSION_DIR`), or `/orbis/session*` and `/memora/session*` are blocked at the gateway.
 - [ ] Egress is restricted to the sites the agent needs, and cloud metadata endpoints are blocked.
 
 Process
@@ -277,7 +280,7 @@ Process
 
 Data
 - [ ] Session files are permission-restricted, never committed, encrypted when moved, and rotated.
-- [ ] Secrets are typed in code and redacted from action maps and diffs before any LLM call.
+- [ ] Secrets are typed in code, and raw HTML or `memora_eval` output from pages holding typed secrets is not sent to a model.
 - [ ] Debug logging (`DEBUG_CDP`, `DEBUG_WEBDRIVER`) is off in production or its output is redacted.
 - [ ] `--insecure-disable-tls-host-verification` is not used in production.
 

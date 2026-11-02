@@ -2,7 +2,7 @@
 
 Orbis can serve the W3C WebDriver protocol, so Selenium (Python, Java, JavaScript, C#, Ruby), WebdriverIO and other WebDriver clients can drive it through `webdriver.Remote(...)`. You do not need to install a browser or a `chromedriver` binary. Each WebDriver session gets its own isolated Orbis browser running on the native engine. This page covers starting the server, connecting from each language, the complete list of implemented endpoints, what is not supported, and how to run test suites in parallel.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -29,18 +29,35 @@ npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 - `--protocol webdriver` is required. Without it the server speaks CDP.
 - The default port is `9222` for every protocol. Port `9515` is used here only by convention (it is chromedriver's default).
 - There is no `--webdriver` flag.
-- Useful options: `--max-sessions <n>` (default `16`), `--no-stealth`, and all network flags ([cli-reference.md](./cli-reference.md), [network-and-proxies.md](./network-and-proxies.md)).
+- Useful options: `--max-sessions <n>` (default `16`), `--session-idle-timeout <sec>` (default `300`), `--no-stealth`, and all network flags ([cli-reference.md](./cli-reference.md), [network-and-proxies.md](./network-and-proxies.md)).
 
 Health check:
 
 ```bash
 curl http://localhost:9515/status
-# {"value":{"ready":true,"message":"Memora WebDriver is ready","build":{"version":"0.1.0","engine":"memora-native"}}}
+# {"value":{"ready":true,"message":"Memora WebDriver is ready","build":{"version":"0.2.0","engine":"memora-native"}}}
 ```
 
 `ready` turns `false` when the session limit is reached.
 
-> **Security:** with `--host localhost` (the default) the server listens on `0.0.0.0`. The WebDriver endpoint has no authentication. Anyone who can reach it can start sessions and run JavaScript that makes network requests from your host. Restrict the port with a firewall or a private network ([security.md](./security.md)).
+> **Security:** with `--host localhost` (the default) the server listens on `127.0.0.1` only. Pass `--host 0.0.0.0` when test runners on other machines or containers must connect, and then set an API key (see below). Anyone who can use the endpoint can start sessions and run JavaScript that makes network requests from your host, so also restrict the port with a firewall or a private network ([security.md](./security.md)).
+
+### API key
+
+When `ORBIS_API_KEY` (or `MEMORA_API_KEY`) is set, every request must send the key, including `/status`. Send it in one of these ways:
+
+- `x-api-key: <key>` header,
+- `Authorization: Bearer <key>` header,
+- `Authorization: Basic` with the key as the password (any user name). This is what Selenium sends when the key is in the URL: `http://orbis:<key>@localhost:9515`,
+- `?apiKey=<key>` in the URL.
+
+A missing or wrong key gets HTTP `401`. Requests made by a web page open in someone's browser (cross-site requests) get `403`.
+
+```python
+driver = webdriver.Remote(command_executor=f"http://orbis:{key}@localhost:9515", options=options)
+```
+
+> **Changed in 0.2.0:** in 0.1.x the WebDriver server had no authentication. If you set `ORBIS_API_KEY` in the server's environment, every Selenium client and health check must now send the key.
 
 The legacy Grid prefix `/wd/hub` is accepted, so `http://localhost:9515/wd/hub` and `http://localhost:9515` both work.
 
@@ -184,13 +201,13 @@ driver = webdriver.Remote("http://localhost:9515", options=options)
 | Setting | Default | How to change |
 | :--- | :--- | :--- |
 | Maximum concurrent sessions | 16 | `--max-sessions <n>` |
-| Idle session reaper | Sessions unused for **5 minutes** are closed (checked every 5 s) | Not configurable from the CLI |
+| Idle session timeout | Sessions unused for **5 minutes** (300 s) are closed | `--session-idle-timeout <sec>`; `0` turns it off |
 | Implicit wait | 0 ms | `driver.implicitly_wait(...)` or the `timeouts` capability |
 | Page load timeout | 300,000 ms | `driver.set_page_load_timeout(...)` |
 | Script timeout | 30,000 ms | `driver.set_script_timeout(...)` |
 
 - Each session has its own Orbis browser: separate cookies, storage, windows and history. Sessions never share state.
-- When the limit is reached, `POST /session` fails with `session not created: Maximum number of sessions (16) reached. Call driver.quit() after each test or raise --max-sessions.`. Leaked sessions (tests that crash before `quit()`) free their slot only after the 5-minute idle reaper runs.
+- When the limit is reached, `POST /session` fails with `session not created: Maximum number of sessions (16) reached. Call driver.quit() after each test or raise --max-sessions.`. Leaked sessions (tests that crash before `quit()`) free their slot only when the idle timeout closes them. Lower `--session-idle-timeout` if crashed tests often fill the server.
 - A session whose last window is closed (`DELETE /window`) is deleted.
 - Page loads through WebDriver do not wait for the page's async work to settle after scripts run (the settle phase is disabled). If content arrives by `fetch` after load, wait for it explicitly with `WebDriverWait`.
 
@@ -234,16 +251,16 @@ All paths below are relative to `/session/{sessionId}` unless marked as global. 
 | POST | `/element/{id}/value` | Send keys. On `<select>`, picks the first option whose text starts with the keys. `ENTER` / `RETURN` submit. |
 | GET | `/element/{id}/screenshot` | Blank PNG. |
 | POST | `/execute/sync`, `/execute/async` | Runs in the page's V8 sandbox. Element references in arguments and results are supported. A script that assigns `window.location` triggers navigation. |
-| GET | `/cookie`, `/cookie/{name}` | Cookies are reported with the current host as `domain`, `path: "/"` and `secure`/`httpOnly` false (the engine stores name and value only). |
+| GET | `/cookie`, `/cookie/{name}` | Returns the cookies that apply to the current page's site. They are reported with the current host as `domain`, `path: "/"` and `secure`/`httpOnly` false, whatever their real attributes. |
 | POST | `/cookie` | Requires an `http(s)` page to be loaded first. |
 | DELETE | `/cookie/{name}`, `/cookie` | |
-| POST / DELETE | `/actions` | Key sources (`keyDown` types into the active element) and pointer sources (`pointerMove` to an element, `pointerDown`/`pointerUp` â†’ click, button 2 â†’ `contextmenu`). `pause` is honoured. Wheel actions are ignored. |
+| POST / DELETE | `/actions` | Key sources (`keyDown` types into the active element) and pointer sources (`pointerMove` to an element, `pointerDown`/`pointerUp` → click, button 2 → `contextmenu`). `pause` is honoured. Wheel actions are ignored. |
 | GET | `/screenshot` | Blank PNG. |
 | POST | `/alert/*`, GET `/alert/text` | Always `no such alert`. |
 | POST | `/print` | `unsupported operation`. |
 | GET | `/element/{id}/shadow` | `no such shadow root`. |
 
-Error responses follow the W3C format: `{"value": {"error": "<code>", "message": "...", "stacktrace": ""}}` with the matching HTTP status (400, 404 or 500).
+Error responses follow the W3C format: `{"value": {"error": "<code>", "message": "...", "stacktrace": ""}}` with the matching HTTP status (400, 404 or 500). Requests rejected by the [API key check](#api-key) get `401` (missing or wrong key) or `403` (cross-site request) before they reach a session.
 
 ## Not supported
 
@@ -252,13 +269,13 @@ Error responses follow the W3C format: `{"value": {"error": "<code>", "message":
 | Alerts, confirms, prompts | `no such alert`. `window.alert` is not even defined in page scripts, so calling it throws a script error. | Test dialog logic on real Chrome. |
 | iframes | `switch_to.frame(...)` raises `no such frame`. Frame content is not loaded. | Navigate to the frame's `src` URL directly. |
 | Shadow DOM | `no such shadow root`. | None. |
-| Screenshots | Blank 1Ã—1 PNG. Calls succeed. | Use real Chrome for visual checks. |
+| Screenshots | Blank 1×1 PNG. Calls succeed. | Use real Chrome for visual checks. |
 | Print to PDF | `unsupported operation`. | |
-| Window size and position | Fixed at 1280Ã—800 and cannot be changed. | |
+| Window size and position | Fixed at 1280×800 and cannot be changed. | |
 | File upload | `send_keys("/path/file.pdf")` on `<input type=file>` stores only the file **name** in the input's value. No file content is sent on submit. | Upload through your application's API in test setup. |
 | CSS computed styles | Only inline `style` values. | Assert on classes or attributes instead. |
 | Visibility from stylesheets | An element hidden by a CSS class (not inline style, not `hidden`) is reported as displayed and is clickable. | Assert visibility through classes or ARIA attributes. |
-| Client-rendered SPAs | Pages that depend on `XMLHttpRequest`, `WebSocket`, `requestAnimationFrame`, `IntersectionObserver`, `history` and similar APIs usually do not render, because the native runtime does not provide them. | Use Orbis for server-rendered pages. See [limitations.md](./limitations.md). |
+| Client-rendered SPAs | Pages that depend on `WebSocket`, `Worker`, `indexedDB`, `customElements`, working observers and similar APIs usually do not render, because the native runtime does not provide them. | Use Orbis for server-rendered pages. See [limitations.md](./limitations.md). |
 | BiDi (`webSocketUrl: true`), CDP-over-Selenium (`execute_cdp_cmd`) | Not available. | |
 
 ## Behavioural differences from Chrome
@@ -354,8 +371,6 @@ In both cases, size `--max-sessions` to the parallelism you route to each server
 
 ## Known issues
 
-> **Known issue (0.1.0):** The idle-session timeout (5 minutes) cannot be changed from the CLI. Crashed tests that skip `quit()` hold a session slot until it expires.
-
-> **Known issue (0.1.0):** `localhost` binds to all interfaces, and there is no authentication on the WebDriver endpoint.
+There are no WebDriver-specific known issues in 0.2.0. Unsupported commands are listed in [Supported endpoints](#supported-endpoints) and [limitations.md](./limitations.md).
 
 See also: [playwright-puppeteer.md](./playwright-puppeteer.md), [limitations.md](./limitations.md), [production-deployment.md](./production-deployment.md), [troubleshooting.md](./troubleshooting.md).

@@ -2,7 +2,7 @@
 
 A locator is the string you pass to `act()`, `fillForm()`, `selectOption()`, `activate()`, `waitForSelector()`, the REST `/orbis/act` and `/orbis/fill-form` endpoints, and the Python SDK, to say *which element* you mean. Orbis resolves every locator through one pipeline of ten strategies, from numbered action IDs (`@3`) for LLM agents to CSS, XPath, text, label, placeholder, test-id and ARIA-role locators for deterministic scripts. This page documents the exact matching rules of each strategy as implemented in `src/dom/locators.ts`, the edge cases we verified, and how to choose the right one for production.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -29,14 +29,14 @@ Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on
 
 | # | Strategy | Syntax | Matching | Best for |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Action ID | `@1`, `@42` | n-th interactive element of the **current full document** | LLM agent loops, right after a snapshot |
-| 2 | Semantic alias | `@email`, `@submit` | first action whose name/placeholder/text/selector contains the word | quick scripts; risky in production |
+| 1 | Action ID | `@1`, `@42` | the element numbered n in the **latest snapshot** of the page (including focused or filtered snapshots) | LLM agent loops, right after a snapshot |
+| 2 | Semantic alias | `@email`, `@submit` | best-scoring action: exact name/id/type first, form fields before links | quick scripts; fuzzy for production |
 | 3 | XPath | `//button[@type="submit"]`, `xpath=...`, `xpath:...` | first node of the XPath result | migrating Selenium suites, ancestor queries |
 | 4 | Text | `text=Sign in`, `text:"Add to cart"` | case-insensitive; exact, then substring, on buttons/links/inputs/selects | buttons and links |
-| 5 | Label | `label:Email`, `label="Email address"` | case-insensitive substring of `<label>` text; then `aria-label` | form fields |
+| 5 | Label | `label:Email`, `label="Email address"` | case-insensitive substring of `<label>` text; then `aria-label`, then `aria-labelledby` | form fields |
 | 6 | Placeholder | `placeholder:Search`, `placeholder=...` | **case-sensitive** substring of `placeholder` | unlabelled inputs |
 | 7 | Test ID | `testid:checkout`, `data-testid=checkout` | exact `data-testid`, `data-test-id`, `data-qa` or `data-cy` | QA/CI suites |
-| 8 | ARIA role | `role:button`, `role=button[name="Save"]` | `[role="x"]` or `<x>` tag; optional name substring | custom widgets with explicit roles |
+| 8 | ARIA role | `role:button`, `role=button[name="Save"]` | `[role="x"]` or a native element with that implicit role; optional accessible name (exact, then substring) | buttons, links, fields and custom widgets |
 | 9 | CSS | `#id`, `.cls`, `input[name="q"]`, `form > button` | first `querySelector` match | everything stable |
 | 10 | Fuzzy | `username` | `#username`, then `[name="username"]`, then `[data-testid="username"]` | short hand in scripts |
 
@@ -50,7 +50,7 @@ All strategies return **one** element (the first match). None of them waits; com
 
 Consequences you should know:
 
-- A locator never throws for "not found". `act()`, `selectOption()`, `type()` return `false`; `fillForm()` lists it in `skipped`; `activate()` throws `Element "<target>" not found`; `waitForSelector()` keeps polling until its timeout.
+- A locator never throws for "not found". `act()`, `selectOption()`, `type()` return (or resolve to) `false`; `fillForm()` lists it in `skipped`; `activate()` throws `Element "<target>" not found`; `waitForSelector()` keeps polling until its timeout.
 - Prefixes are recognised by their exact spelling: `text=`/`text:`, `label:`/`label=`, `placeholder:`/`placeholder=`, `testid:`/`testid=`/`data-testid:`/`data-testid=`, `role:`/`role=`, `xpath:`/`xpath=` or a leading `//`. Anything else (for example `data-test:go` or `aria-label:Close`) falls through to CSS and normally resolves to nothing.
 - A bare word is tried as CSS first (a **tag name**) and only then as an id/name/test id. `button` therefore returns the first `<button>`, not an element with `id="button"`.
 
@@ -64,38 +64,34 @@ Syntax: `@` followed by digits only (`/^@\d+$/`).
 
 Every snapshot numbers the interactive elements of the page in **document order**, starting at `@1`. Interactive means `a`, `button`, `input`, `select`, `textarea`, `summary`, elements with role `button`/`link`/`checkbox`/`radio`/`tab`/`menuitem`/`switch`/`option`/`treeitem`, `tabindex="0"`, or an `onclick` attribute. Elements inside `script`, `style`, `noscript`, `svg`, `canvas` and `template` are ignored, and **hidden elements are skipped**: `hidden`, `aria-hidden="true"`, `input[type=hidden]`, inline `display:none` or `visibility:hidden`, on the element or any ancestor. Stylesheet rules are not evaluated, so elements hidden only by CSS classes still get numbers.
 
-Resolution: when you pass `@n`, Orbis **takes a new snapshot of the full document right now** (no focus, no exclusions, hidden elements filtered) and returns its n-th element. The number is not looked up in the snapshot you or your LLM read earlier. This has three important consequences (all verified):
+Resolution: when you pass `@n`, Orbis looks the number up in the **latest snapshot taken of the page** (as long as the page has not navigated since) and returns the element shown there. If there is no such snapshot, it takes a new snapshot of the full document and uses its n-th element. Consequences:
 
-1. **IDs from a focused snapshot do not match.** `snapshot({ focusSelector: 'main' })` numbers only the elements inside `<main>`, but `act('@1')` is resolved against the whole page. On a page with a navigation link before the form, `@1` of the focused snapshot was the email input while `act('@1')` targeted the link.
-2. **The same applies to `excludeSelectors` and `filterHidden: false`.** Only `@IDs` from a default `snapshot()` / `goto()` (no options) are safe to pass back.
-3. **IDs shift when the DOM changes.** If a script inserts a banner, reveals a field or re-renders a list between your snapshot and your `act()`, every later number moves. Re-snapshot after each action (the `diff()` output already contains fresh numbers) and never cache `@IDs` across navigations or turns.
-
-The resolved element also gets the number stamped on it, so the `diff()` taken next uses the same numbering.
+1. **IDs from focused or filtered snapshots work.** `snapshot({ focusSelector: 'main' })` numbers only the elements inside `<main>`, and `act('@1')` then resolves to the first element of that focused snapshot. The same applies to `excludeSelectors` and `filterHidden: false`.
+2. **Use the latest snapshot.** IDs refer to the most recent snapshot or diff. If you take another snapshot (for example with different options) before acting, the IDs of the earlier one no longer apply.
+3. **IDs change when the DOM changes.** If a script inserts a banner, reveals a field or re-renders a list, the next snapshot numbers elements differently. Re-snapshot after each action (the `diff()` output already contains fresh numbers) and never cache `@IDs` across navigations or turns.
 
 ```ts
-const snap = await agent.goto('https://example.com/signup'); // default options => safe IDs
-agent.act('@1', 'ada@example.com');
-await agent.page.activate('@4');
-const delta = agent.diff();      // numbers in delta.summary are valid right now
+const snap = await agent.goto('https://example.com/signup');
+await agent.act('@1', 'ada@example.com');
+await agent.act('@4');               // clicks like a real browser (follows links, submits forms)
+const delta = agent.diff();          // numbers in delta.summary are valid right now
 ```
 
-If you need to target an element of a focused snapshot, use the element's `selector` field instead of its `actionId`:
+IDs from a focused snapshot:
 
 ```ts
 const form = agent.snapshot({ focusSelector: 'form#checkout' });
 const pay = form.actions.find(a => a.text === 'Pay now');
-await agent.page.activate(pay!.selector);
+await agent.act(pay!.actionId);
 ```
 
 ### Semantic aliases: `@word`
 
 Syntax: `@` followed by anything that is not only digits (`@email`, `@first-name`, `@submit`).
 
-Resolution: takes a full snapshot and returns the **first action in document order** for which any of these is true (all compared lower-case): `name` equals the word, `placeholder` equals it, `text` equals it, or `name`, `placeholder`, `selector` or `text` **contains** it.
+Resolution: compares the word (lower-case) with every action of the latest snapshot and returns the **best match**, not the first one. From best to weakest: `name` equals the word; the element's id equals it; an input's `type` equals it; `placeholder` or `text` equals it; `name`, `placeholder`, `selector` or `text` contains it. On equal terms, form fields win over links and buttons. For example, on a page with a navigation link "Email us" before `<input name="email">`, `@email` resolves to the **input**.
 
-Because "contains" is checked for each element before moving to the next, an earlier element that merely contains the word wins over a later exact match. Verified: on a page with a navigation link "Email us" before `<input name="email">`, `@email` resolved to the **link**.
-
-Use aliases for exploration and demos. In production prefer `label:`, `placeholder:`, `testid:` or CSS (`input[name="email"]`).
+Aliases are still a fuzzy match. Use them for exploration and demos. In production prefer `label:`, `placeholder:`, `testid:` or CSS (`input[name="email"]`).
 
 ### XPath
 
@@ -135,15 +131,14 @@ Syntax: `label:Email`, `label=Email address`, optionally quoted.
 Matching:
 
 1. For each `<label>` in document order whose text **contains** the query (case-insensitive): if it has `for="id"`, return `#id`; otherwise return the first `input`, `select` or `textarea` nested inside it. If neither exists, continue with the next label.
-2. Otherwise, return the first element whose `aria-label` attribute contains the query.
-
-> **Known issue (0.1.0, verified):** step 2 lower-cases your query but compares it case-sensitively against `aria-label`. `label:Search Products` and `label:search products` both fail to find `<input aria-label="Search Products">`. Only all-lower-case `aria-label` values match. Use CSS instead: `input[aria-label="Search Products"]`, or a [custom strategy](#custom-strategies).
+2. Otherwise, return the first element whose `aria-label` attribute contains the query (case-insensitive). `label:Search Products` and `label:search products` both find `<input aria-label="Search Products">`.
+3. Otherwise, return the first element with `aria-labelledby` whose referenced text contains the query (case-insensitive).
 
 Other notes:
 
 - Substring matching: `label:Email` also matches "Backup email" if that label comes first. Use the longest unambiguous text.
 - `for` values are used as `#id` selectors; ids that are not valid CSS identifiers (starting with a digit, containing `:`) do not resolve through this path.
-- Label text is **not shown** in the action map (an `<input>` with only a `<label>` appears as `"[Untitled input]"`), so an LLM cannot "see" label names from the action map alone. The Markdown contains the label text; or give the agent CSS selectors from the `selector` field.
+- Label text is shown in the action map: an `<input>` with a `<label for>` or a wrapping `<label>` appears with the label text as its name, so an LLM sees the same name you would use with `label:`.
 
 ### Placeholder: `placeholder:`
 
@@ -163,17 +158,24 @@ This is the most stable locator for applications you control. Add test ids to cr
 
 Syntax: `role:<name>` or `role:<name>[name="<accessible name>"]` (also `role=`; quotes around the name are optional).
 
-Matching: candidates are elements with `role="<name>"` **or** whose tag name is `<name>`. Without a name, the first candidate is returned. With a name, the first candidate whose `aria-label`, else `value`, else text content **contains** the name (case-insensitive).
+Matching: candidates are elements with `role="<name>"` **and** native elements whose implicit role is `<name>` (an element with a different explicit `role` is skipped). Without a name, the first candidate is returned. With a name, the first candidate whose accessible name **equals** the name is returned, otherwise the first whose accessible name **contains** it (both case-insensitive). The accessible name comes from `aria-label`, `aria-labelledby`, an associated `<label>`, `alt`/`title`/`placeholder`/`value`, or the element's text.
 
-Implicit roles are not computed. `role:button` finds `<button>` elements (the tag has the same name), but:
+Implicit roles include:
 
-- `role:link` does **not** find `<a href>` (verified); it would match the `<link>` tag in `<head>` instead.
-- `role:textbox`, `role:checkbox`, `role:combobox`, `role:heading` do not find native `<input>`, `<select>` or `<h1>` elements.
-
-Use `role:` for components that set `role` explicitly (custom dropdowns, tabs, menus) and use `text=`, `label:` or CSS for native elements.
+| Role | Native elements |
+| :--- | :--- |
+| `link` | `<a href>`, `<area href>` |
+| `button` | `<button>`, `<input type="button">`, `type="submit"`, `type="reset"`, `type="image"`, `<summary>` |
+| `textbox` | text-like `<input>` (no type, `text`, `email`, `tel`, `url`, `search`, `password`), `<textarea>` |
+| `checkbox`, `radio` | `<input type="checkbox">`, `<input type="radio">` |
+| `combobox`, `listbox` | `<select>`, `<select multiple>` |
+| `heading` | `<h1>` to `<h6>` |
+| others | `searchbox`, `option`, `img` (with `alt`), `list`, `listitem`, `navigation`, `main`, `form`, `table`, `row`, `cell`, `dialog` |
 
 ```text
+role:link[name="Pricing"]
 role:button[name="Close dialog"]
+role:textbox[name="Email"]
 role=tab[name='Billing']
 role:menuitem[name="Delete"]
 ```
@@ -194,13 +196,12 @@ A string made only of letters, digits, `_` and `-` (for example `username`, `q`,
 
 | Situation | Recommended locator | Why |
 | :--- | :--- | :--- |
-| LLM chooses an element it just saw in the action map | `@n` from a default snapshot taken after the last action | Shortest, matches what the model saw |
-| LLM chooses an element from a focused snapshot | the action's `selector` | `@n` would be resolved against the full page |
+| LLM chooses an element it just saw in the action map | `@n` from the latest snapshot (focused or not) taken after the last action | Shortest, matches what the model saw |
 | Your own app, deterministic tests | `testid:` | Exact, survives copy and layout changes |
 | Form fields on third-party sites | `label:` (unique text), `input[name="..."]`, `placeholder:` | Stable across layout changes |
 | Buttons and links | `text=` with the full label | Readable; check for hidden duplicates |
 | Elements found by structure | XPath with `xpath=` prefix | Ancestors, siblings, positions |
-| Custom ARIA widgets | `role:<role>[name="..."]` | Uses explicit roles |
+| Custom ARIA widgets and native controls by role | `role:<role>[name="..."]` | Uses explicit and implicit roles |
 | Anything you can see in DevTools | CSS | Predictable, fast |
 | Persisting a target between runs | CSS or `testid:` | `@n` and aliases are positional/fuzzy |
 
@@ -250,7 +251,7 @@ const ariaLabel: LocatorStrategy = {
 
 defaultLocatorEngine.registerStrategy(ariaLabel, true);
 
-agent.act('aria:close dialog'); // matches aria-label="Close Dialog"
+await agent.act('aria:close dialog'); // matches aria-label="Close Dialog"
 ```
 
 `defaultLocatorEngine` is shared by **every page in the process**. To scope a strategy to one page, give that page its own engine:
@@ -271,16 +272,15 @@ Custom strategies apply to the TypeScript SDK and to anything running in the sam
 
 | Locator | Page | Result | Lesson |
 | :--- | :--- | :--- | :--- |
-| `@1` from `snapshot({ focusSelector: 'main' })` | nav link before `<main>` | resolves to the nav link | Only reuse IDs from default snapshots |
-| `@email` | link "Email us" before `<input name="email">` | the link | Aliases are substring matches in document order |
-| `label:Search Products` | `<input aria-label="Search Products">` | not found | aria-label fallback is case-sensitive against a lower-cased query |
-| `role:link` | `<a href="/x">Docs</a>` | not found | Implicit roles are not computed |
+| `@1` from `snapshot({ focusSelector: 'main' })` | nav link before `<main>` | the first element inside `<main>` | IDs refer to the snapshot you took |
+| `@email` | link "Email us" before `<input name="email">` | the input | Aliases pick the best match, form fields first |
+| `label:Search Products` | `<input aria-label="Search Products">` | found | `aria-label` matching is case-insensitive |
+| `role:link` | `<a href="/x">Docs</a>` | found | Implicit roles are computed |
 | `role:button[name="close"]` | `<div role="button" aria-label="Close dialog">` | found | Name match is case-insensitive substring |
 | `text=Secret` | button inside a `hidden` div | found | Text locators include hidden elements |
 | `placeholder:work` | `placeholder="Work email"` | not found | Placeholder matching is case-sensitive |
 | `(//a)[2]` | two links | not found | Prefix XPath with `xpath=` unless it starts with `//` |
 | `button` | several buttons | first `<button>` | Bare words are tried as tag names first |
 | `data-test:go` | `data-test="go"` | not found | Only `testid:` / `data-testid:` prefixes exist |
-| `[Untitled input]` in the action map | `<label for="email">Email</label><input id="email">` | label text not shown | Use `label:Email` or the `selector` field |
 
 Related reading: [typescript-sdk.md](./typescript-sdk.md) for the methods that accept locators, [best-practices.md](./best-practices.md) for agent-loop patterns, [troubleshooting.md](./troubleshooting.md) for "element not found" debugging.

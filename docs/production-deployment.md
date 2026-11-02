@@ -1,8 +1,8 @@
 # Production Deployment
 
-This guide explains how to run Orbis reliably in production: which runtime mode to choose, how Orbis uses processes and memory, how to package it for Docker, Kubernetes, systemd and PM2, which timeouts apply, how to observe it, and what to check before going live. Read it together with [security.md](./security.md). The Orbis server has no working authentication in 0.1.0 and listens on every network interface by default, so network isolation is required.
+This guide explains how to run Orbis reliably in production: which runtime mode to choose, how Orbis uses processes and memory, how to package it for Docker, Kubernetes, systemd and PM2, which timeouts apply, how to observe it, and what to check before going live. Read it together with [security.md](./security.md). By default the Orbis server listens on `127.0.0.1` only. When other hosts or containers must reach it, set an API key (`ORBIS_API_KEY`) and keep the port on a private network.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -61,18 +61,16 @@ Understanding these facts prevents most production incidents.
 
 **One Orbis process is one Node.js event loop.** Page scripts run synchronously in `node:vm` contexts inside that process. A CPU-heavy page blocks every other page in the same process for up to 5 seconds per script batch (see [Timeouts](#9-timeouts)). Scale out with more processes, not more pages per process.
 
-**The daemon's REST and Python API share one page.** The agent endpoints (`/orbis/goto`, `/orbis/act`, `/orbis/fill-form`, `/orbis/snapshot`, `/orbis/diff`, `/orbis/session`) work on the browser's *default page* unless you pass `?id=<pageId>`. `/orbis/goto` always uses the default page, and the Python SDK never sends an `id`. Two Python agents talking to the same daemon will overwrite each other's page, cookies and history.
+**The daemon's REST and Python API share one page.** The agent endpoints (`/orbis/goto`, `/orbis/act`, `/orbis/fill-form`, `/orbis/snapshot`, `/orbis/diff`, `/orbis/session`) work on the browser's *default page* unless you pass `?id=<pageId>`. The Python SDK never sends an `id`, so two Python agents talking to the same daemon will overwrite each other's page, cookies and history. Isolate Python agents by giving each one its own daemon.
 
-> **Known issue (0.1.0):** `GET /orbis/goto` ignores `id` and always navigates the default page. The Python SDK has no way to select a page. Isolate Python agents by giving each one its own daemon.
-
-**CDP clients get their own pages, but share the process.** Playwright/Puppeteer `newPage()` creates a separate page, and each page has its own cookie jar. A CDP `Browser.close` command closes **every** page in the daemon, including pages that belong to other clients.
+**CDP clients get their own pages, but share the process.** Playwright/Puppeteer `newPage()` creates a separate page, and each page has its own cookie jar. A CDP `Browser.close` command closes only the pages that client created; other clients' pages stay open.
 
 **WebDriver sessions are isolated.** Each `POST /session` gets its own browser instance and page. Defaults:
 
 | Setting | Default | Configurable |
 | :--- | :--- | :--- |
 | Maximum concurrent sessions | 16 | `--max-sessions <n>` |
-| Idle session reaper | Sessions unused for 5 minutes are closed (checked every 5 s) | Only programmatically (`new WebDriverServer({ sessionIdleTimeoutMs })`) |
+| Idle session reaper | Sessions unused for 5 minutes (300 s) are closed (checked every 5 s) | `--session-idle-timeout <sec>`; `0` turns it off |
 | `/status` `ready` | `false` once the session limit is reached | Use it for load-balancer readiness |
 
 **Recommended topologies**
@@ -81,7 +79,7 @@ Understanding these facts prevents most production incidents.
 | :--- | :--- |
 | Node.js job queue (scraping, form automation) | In-process `OrbisBrowser`, one page per job, `page.close()` (or `browser.closePage(id)`) when done |
 | Python agents (LangChain, CrewAI, custom) | One daemon per worker process, bound to loopback or a private pod network, on its own port |
-| Playwright/Puppeteer fleet | One daemon per worker, or a small pool of daemons with sticky assignment. Never call `browser.close()` on a shared daemon. |
+| Playwright/Puppeteer fleet | One daemon per worker, or a small pool of daemons with sticky assignment. `browser.close()` only closes the pages that client created. |
 | Selenium grid replacement | WebDriver daemons behind a load balancer that reads `/status` `ready`, with `--max-sessions` sized to the CPU you give each process |
 
 **Memory.** Measured on a Windows 11 laptop (Node 22, 30 Oct 2026), an Orbis process with 10 local test pages open used about 107 MB resident memory. In the same test, headless Chrome used 1,154 MB (see the [benchmark notes](../README.md)). Real-world memory depends on page size, script count and how many pages you keep open. Measure with your own workload, and size limits from that measurement, not from these figures.
@@ -98,10 +96,11 @@ ENV NODE_ENV=production \
     ORBIS_NO_TELEMETRY=1
 
 # Install the published package globally (registers the `orbis` binary)
-RUN npm install -g @memoracompany/memora-orbis@0.1.0 && npm cache clean --force
+RUN npm install -g @memoracompany/memora-orbis@0.2.0 && npm cache clean --force
 
-# Writable directory for session files only
+# Writable directory for session files only (session files must live in the start folder or ORBIS_SESSION_DIR)
 RUN mkdir -p /data/sessions && chown -R node:node /data
+ENV ORBIS_SESSION_DIR=/data/sessions
 WORKDIR /data
 USER node
 
@@ -111,18 +110,20 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1:9222/json/version >/dev/null || exit 1
 
 ENTRYPOINT ["orbis"]
-# 0.0.0.0 is required inside a container. Only ever publish this port on a private network.
+# 0.0.0.0 is required inside a container (the default binds 127.0.0.1 only).
+# Only ever publish this port on a private network, and set ORBIS_API_KEY at run time.
+# With a key set, the health check must send it too, e.g. --header "x-api-key: $ORBIS_API_KEY".
 CMD ["--port", "9222", "--host", "0.0.0.0"]
 ```
 
 Build and run without publishing the port to the host's public interfaces:
 
 ```bash
-docker build -t orbis:0.1.0 .
+docker build -t orbis:0.2.0 .
 ```
 
 ```bash
-docker run -d --name orbis --read-only --tmpfs /tmp -v orbis-sessions:/data/sessions --memory 512m --cpus 1 -p 127.0.0.1:9222:9222 orbis:0.1.0
+docker run -d --name orbis --read-only --tmpfs /tmp -v orbis-sessions:/data/sessions --memory 512m --cpus 1 -p 127.0.0.1:9222:9222 orbis:0.2.0
 ```
 
 Notes:
@@ -130,18 +131,18 @@ Notes:
 - `-p 127.0.0.1:9222:9222` publishes only on the host's loopback. Never use `-p 9222:9222`. It publishes on every host interface.
 - Stealth is on by default. There is no `--stealth` flag. Use `--no-stealth` to turn it off (see [stealth.md](./stealth.md)).
 - The Alpine image has no Chrome, so `--mcp --engine auto` uses the native engine automatically. The Chrome engine is only used in MCP mode.
-- For a WebDriver image, change `CMD` to `["serve", "--protocol", "webdriver", "--port", "9515", "--host", "0.0.0.0", "--max-sessions", "8"]` and `EXPOSE 9515`. Its health endpoint is `GET /status`.
-- Pin the version (`@0.1.0`) so rebuilds are reproducible.
+- For a WebDriver image, change `CMD` to `["serve", "--protocol", "webdriver", "--port", "9515", "--host", "0.0.0.0", "--max-sessions", "8"]` and `EXPOSE 9515`. Its health endpoint is `GET /status`. When `ORBIS_API_KEY` is set, the WebDriver server checks it on every request, `/status` included (missing or wrong key: `401`), so the health check must send it, and Selenium clients put it in the server URL: `http://orbis:<key>@127.0.0.1:9515` (see [selenium-webdriver.md](./selenium-webdriver.md#api-key)).
+- Pin the version (`@0.2.0`) so rebuilds are reproducible.
 
 ## 4. Docker Compose with an authenticating reverse proxy
 
-Orbis 0.1.0 does not enforce API keys (see [security.md](./security.md#2-verified-security-properties-of-010)). If more than one host must reach the daemon, put a reverse proxy in front of it that does the authentication. Keep Orbis on an internal-only network.
+Orbis checks an API key itself when `ORBIS_API_KEY` is set (see [security.md](./security.md)). A reverse proxy is still useful when more than one host must reach the daemon: it adds TLS, IP allow-lists and a single place to rotate credentials. Keep Orbis on an internal-only network.
 
 ```yaml
 # docker-compose.yml
 services:
   orbis:
-    image: orbis:0.1.0
+    image: orbis:0.2.0
     read_only: true
     tmpfs: [/tmp]
     volumes:
@@ -184,7 +185,7 @@ https://orbis.internal.example.com:8443 {
     header Authorization "Bearer {$ORBIS_GATEWAY_TOKEN}"
   }
 
-  # Never expose session file endpoints through the gateway (arbitrary file read/write)
+  # Don't expose session file endpoints through the gateway (they read and write files on the server)
   @sessionFiles path /orbis/session /orbis/session/* /memora/session /memora/session/*
   respond @sessionFiles 403
 
@@ -232,11 +233,13 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: orbis
-          image: registry.example.com/orbis:0.1.0
+          image: registry.example.com/orbis:0.2.0
           args: ["--port", "9222", "--host", "0.0.0.0"]
           env:
             - name: ORBIS_NO_TELEMETRY
               value: "1"
+            - name: ORBIS_SESSION_DIR
+              value: /data/sessions
           ports:
             - name: cdp
               containerPort: 9222
@@ -324,8 +327,11 @@ User=orbis
 Group=orbis
 Environment=NODE_ENV=production
 Environment=ORBIS_NO_TELEMETRY=1
+Environment=ORBIS_SESSION_DIR=/var/lib/orbis/sessions
+# Required when other hosts connect; better: EnvironmentFile= with restricted permissions
+Environment=ORBIS_API_KEY=change-me
 WorkingDirectory=/var/lib/orbis
-# Bind to a specific private interface; "localhost" and "127.0.0.1" bind 0.0.0.0 in 0.1.0
+# Bind to a specific private interface (the default, localhost, binds 127.0.0.1 only)
 ExecStart=/usr/bin/orbis --port 9222 --host 10.0.0.5
 Restart=always
 RestartSec=2
@@ -363,9 +369,9 @@ sudo systemctl daemon-reload && sudo systemctl enable --now orbis
 
 Find the binary path with `which orbis` after `npm i -g @memoracompany/memora-orbis`.
 
-> **Known issue (0.1.0):** passing `--host localhost` or `--host 127.0.0.1` makes Orbis listen on `0.0.0.0` (all interfaces). To listen on one interface only, pass that interface's IP, for example `--host 10.0.0.5`. For loopback-only access, use `--host 127.0.0.2`. It is a loopback address that Orbis does not rewrite. It works out of the box on Linux and Windows; on macOS, first run `sudo ifconfig lo0 alias 127.0.0.2`. Clients then connect to `http://127.0.0.2:<port>`. Either way, also firewall the port.
+Bind addresses: `--host localhost` (the default) and `--host 127.0.0.1` listen on `127.0.0.1` only; `--host ::1` listens on the IPv6 loopback (URLs show `[::1]`); a specific IP such as `--host 10.0.0.5` listens on that interface only; `--host 0.0.0.0` listens on every interface. For anything other than loopback, set `ORBIS_API_KEY` and also firewall the port.
 
-> **Known issue (0.1.0):** do not pass an IPv6 literal such as `--host ::1`. The server starts, but the first HTTP request crashes the process (`new URL('http://::1:â€¦')` is invalid), and the advertised `webSocketDebuggerUrl` is malformed.
+> **Changed in 0.2.0:** `--host localhost` and `--host 127.0.0.1` used to listen on all interfaces, and `--host ::1` crashed on the first request. If you relied on `localhost` being reachable from other machines or containers, pass `--host 0.0.0.0` explicitly.
 
 ## 7. PM2
 
@@ -377,7 +383,7 @@ module.exports = {
       name: 'orbis-worker-1',
       script: 'orbis',                 // global binary from npm i -g @memoracompany/memora-orbis
       interpreter: 'none',
-      args: '--port 9301 --host 127.0.0.2',
+      args: '--port 9301',             // default host: 127.0.0.1 only
       env: { NODE_ENV: 'production', ORBIS_NO_TELEMETRY: '1' },
       max_memory_restart: '600M',      // recycle when memory grows
       kill_timeout: 15000,             // time allowed for SIGINT shutdown
@@ -387,7 +393,7 @@ module.exports = {
       name: 'orbis-worker-2',
       script: 'orbis',
       interpreter: 'none',
-      args: '--port 9302 --host 127.0.0.2',
+      args: '--port 9302',
       env: { NODE_ENV: 'production', ORBIS_NO_TELEMETRY: '1' },
       max_memory_restart: '600M',
       kill_timeout: 15000,
@@ -402,9 +408,9 @@ Do not use PM2 cluster mode (`exec_mode: 'cluster'`). Clustered workers share on
 
 | Mode | Signal handling |
 | :--- | :--- |
-| CDP daemon | `SIGINT`/`SIGTERM` â†’ prints `Shutting down browser server...`, closes the WebSocket and HTTP servers, closes all pages, exits 0. Closing the HTTP server waits for open keep-alive connections, so set a stop timeout (`TimeoutStopSec`, `terminationGracePeriodSeconds`, `kill_timeout`). |
-| WebDriver daemon | `SIGINT`/`SIGTERM` â†’ closes every session, force-closes connections, exits 0. |
-| MCP | `SIGINT`/`SIGTERM` â†’ closes the engine (including a launched Chrome in Chrome mode), exits 0. |
+| CDP daemon | `SIGINT`/`SIGTERM` → prints `Shutting down browser server...`, closes the WebSocket and HTTP servers, closes all pages, exits 0. Closing the HTTP server waits for open keep-alive connections, so set a stop timeout (`TimeoutStopSec`, `terminationGracePeriodSeconds`, `kill_timeout`). |
+| WebDriver daemon | `SIGINT`/`SIGTERM` → closes every session, force-closes connections, exits 0. |
+| MCP | `SIGINT`/`SIGTERM` → closes the engine (including a launched Chrome in Chrome mode), exits 0. |
 | In-process SDK | Your responsibility: `await agent.close()` or `browser.close()`. |
 
 There is no built-in memory cap and no automatic page eviction for CDP/REST pages. Pages created with `/json/new` or by CDP clients stay in memory until closed (`/json/close/<id>`, `Target.closeTarget`, `page.close()` in Playwright). Recommended practice:
@@ -417,8 +423,7 @@ There is no built-in memory cap and no automatic page eviction for CDP/REST page
 
 | Timeout | Default | Where it applies | How to change it |
 | :--- | :--- | :--- | :--- |
-| Navigation (HTTP request incl. redirects) | 20 000 ms | `page.goto()`, `agent.goto()`, REST `/orbis/goto`, CDP `Page.navigate` | `page.goto(url, { timeoutMs })`; MCP `memora_browse` `timeout` argument |
-| Fetcher default | 15 000 ms | Only requests that do not pass their own timeout | `--http-timeout` / `network.timeoutMs` (see the known issue below) |
+| Navigation (HTTP request incl. redirects) | 20 000 ms | `page.goto()`, `agent.goto()`, REST `/orbis/goto`, CDP `Page.navigate` | `--http-timeout` / `network.timeoutMs` for every navigation; per call `page.goto(url, { timeoutMs })` (wins over the default); MCP `memora_browse` `timeout` argument |
 | Post-load settle (await page fetch/promises/short timers) | 5 000 ms, capped by the navigation deadline | Every `goto()` in SDK, CDP and REST | `page.settleTimeoutMs = n` or `page.goto(url, { settleTimeoutMs })`; `0` disables |
 | Page script watchdog | 5 000 ms per batch of page scripts | Classic and module `<script>` execution | Not configurable. The batch is stopped and `Script terminated after 5000ms` is logged. |
 | `evaluate()` / CDP `Runtime.evaluate` | 30 000 ms | SDK and CDP script evaluation | Not configurable |
@@ -426,11 +431,9 @@ There is no built-in memory cap and no automatic page eviction for CDP/REST page
 | WebDriver script | 30 000 ms | `execute_script`, `execute_async_script` | Selenium `set_script_timeout()` |
 | WebDriver implicit wait | 0 ms | `find_element` | Selenium `implicitly_wait()` |
 | robots.txt fetch | 10 000 ms | `--obey-robots` | Not configurable |
-| Python SDK HTTP | 5 s connect check, 15 s per call, 10 s for `markdown()` | `orbis` Python package | Not configurable (wrap calls, or call the REST API directly) |
+| Python SDK HTTP | 60 s per call | `orbis` Python package | `OrbisAgent(url, timeout=...)` or `OrbisAgent.connect(url, timeout=...)` |
 
-> **Known issue (0.1.0):** `--http-timeout` and `network.timeoutMs` do not affect page navigations. `page.goto()` always passes its own timeout (20 000 ms by default), and that value takes precedence. Verified: with `--http-timeout 200`, a page that takes 1.5 s still loads. To shorten navigations, call `page.goto(url, { timeoutMs })` (SDK) or pass `timeout` to `memora_browse` (MCP).
-
-> **Known issue (0.1.0):** the Python SDK's 15-second HTTP timeout is shorter than the daemon's 20-second navigation timeout, so a slow page can raise a Python timeout while the daemon is still loading it. See [troubleshooting.md](./troubleshooting.md#python-sdk-calls-time-out).
+> **Changed in 0.2.0:** `--http-timeout` / `network.timeoutMs` now limits navigations (earlier versions ignored it), and the Python SDK's default timeout is 60 s, longer than the daemon's 20 s navigation timeout (it was 15 s).
 
 > **Note:** WebDriver `driver.get()` navigates with the settle phase disabled (`settleTimeoutMs: 0`). Asynchronous page work (`fetch` + render) may not be finished when `get()` returns, so use explicit waits (`WebDriverWait`) in Selenium tests.
 
@@ -439,9 +442,9 @@ There is no built-in memory cap and no automatic page eviction for CDP/REST page
 | Signal | How to get it |
 | :--- | :--- |
 | CDP traffic | `DEBUG_CDP=1` logs every CDP request, response and event (method names, ids, session ids) to stdout. Very verbose, so enable it only when debugging. |
-| WebDriver traffic | `DEBUG_WEBDRIVER=1` writes `[WebDriver] METHOD /path bodyâ€¦` (first 200 bytes) to stderr |
+| WebDriver traffic | `DEBUG_WEBDRIVER=1` writes `[WebDriver] METHOD /path body…` (first 200 bytes) to stderr |
 | Page console | SDK: `page.getLogs()` / `page.clearLogs()`; MCP: `memora_console`; Chrome engine: browser console messages |
-| Script errors | Logged into the page console (`Uncaught â€¦`, `Failed to load script â€¦`, `Script terminated after 5000ms`) |
+| Script errors | Logged into the page console (`Uncaught …`, `Failed to load script …`, `Script terminated after 5000ms`) |
 | robots.txt blocks | `[Memora] blocked by robots.txt: <url>` on stderr; the navigation throws `RobotsBlockedError` (`code: 'ERR_BLOCKED_BY_ROBOTS'`) |
 | Health | CDP: `GET /json/version` (200 JSON). WebDriver: `GET /status` (`value.ready`). |
 | Process metrics | Use your platform: container memory/CPU, Node.js RSS. Orbis has no metrics endpoint. |
@@ -452,7 +455,7 @@ Recommended application-level metrics, emitted by your own wrapper code: navigat
 
 ## 11. Outbound version check and air-gapped environments
 
-When the server starts (CDP, WebDriver, MCP and `--eval` modes), Orbis sends one request in the background to `https://orbis.memora.company/api/v1/version-check?v=0.1.0`, with a 1.5-second timeout. It never blocks startup and fails silently. The `fetch` subcommand does not perform this check.
+When the server starts (CDP, WebDriver, MCP and `--eval` modes), Orbis sends one request in the background to `https://orbis.memora.company/api/v1/version-check?v=0.2.0`, with a 1.5-second timeout. It never blocks startup and fails silently. The `fetch` subcommand does not perform this check.
 
 Disable it with either variable:
 
@@ -463,17 +466,17 @@ export ORBIS_NO_TELEMETRY=1
 `NODE_ENV=test` also disables it. Set `ORBIS_NO_TELEMETRY=1` in:
 
 - air-gapped or egress-restricted networks,
-- **MCP configurations.** If a newer version is announced, the update notice is printed with `console.log`, which writes to stdout. In MCP mode stdout is the JSON-RPC channel, so a strict MCP client may reject that line (see [mcp.md](./mcp.md)).
+- CI and MCP configurations, to avoid the outbound call. The update notice itself is written to stderr, so it never mixes with the MCP protocol on stdout.
 
 ## 12. Using Orbis in CI
 
-Smoke-check a deployment with the `fetch` subcommand. It exits with code 1 when the request fails:
+Smoke-check a deployment with the `fetch` subcommand. It exits with code 1 when the request fails or the page answers with HTTP 4xx/5xx:
 
 ```bash
 npx -y @memoracompany/memora-orbis fetch https://staging.example.com/health --dump action_map --http-timeout 15000
 ```
 
-Do not rely on `--eval` in CI. It prints errors but always exits 0.
+`--eval` also exits 1 when the page fails to load or answers with HTTP 4xx/5xx.
 
 Example GitHub Actions job running Selenium tests against Orbis:
 
@@ -489,7 +492,7 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: npm install -g @memoracompany/memora-orbis@0.1.0
+      - run: npm install -g @memoracompany/memora-orbis@0.2.0
       - name: Start Orbis WebDriver
         run: |
           orbis serve --protocol webdriver --port 9515 > orbis.log 2>&1 &
@@ -510,7 +513,8 @@ See [selenium-webdriver.md](./selenium-webdriver.md) for the supported command s
 | `NODE_ENV=test` | Also disables the version check |
 | `DEBUG_CDP` | Verbose CDP logging to stdout |
 | `DEBUG_WEBDRIVER` | WebDriver request logging to stderr |
-| `ORBIS_API_KEY` / `MEMORA_API_KEY` | Read by the SDKs and sent as `x-api-key` and `Authorization: Bearer` headers. **Not enforced by the 0.1.0 server.** It is only useful if a gateway checks it. |
+| `ORBIS_API_KEY` / `MEMORA_API_KEY` | On the CDP/REST and WebDriver servers: every HTTP request and CDP connection must send this key (`x-api-key`, `Authorization: Bearer` or `?apiKey=`; the WebDriver server also accepts `Authorization: Basic` with the key as the password, as in `http://orbis:<key>@127.0.0.1:9515`), otherwise `401`. In the SDKs: sent automatically as `x-api-key` and `Authorization: Bearer` headers. |
+| `ORBIS_SESSION_DIR` | Folder where the session endpoints and `memora_session` may read and write `.json` files. Default: the folder the server was started in. |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (and lower-case forms) | Used only with `--use-env-proxy` / `network.useEnvProxy` |
 | `LOCALAPPDATA` | Windows: used to locate a per-user Chrome install for the MCP Chrome engine |
 
@@ -519,8 +523,8 @@ See [selenium-webdriver.md](./selenium-webdriver.md) for the supported command s
 Network and security
 
 - [ ] The Orbis port is unreachable from the internet (firewall, no public `-p`, ClusterIP + NetworkPolicy, or a sidecar).
-- [ ] You don't rely on `--host localhost` / `127.0.0.1` for isolation (both bind `0.0.0.0` in 0.1.0).
-- [ ] Any cross-host access goes through a reverse proxy that authenticates callers and blocks `/orbis/session*` and `/memora/session*`.
+- [ ] `--host 0.0.0.0` (or a specific interface) is only used where other hosts must connect, and then `ORBIS_API_KEY` is set.
+- [ ] Session files live in a dedicated folder (`ORBIS_SESSION_DIR`), or the session endpoints are blocked at the gateway.
 - [ ] Tenants and credentials are isolated per process (see [security.md](./security.md)).
 - [ ] Session files are stored in a dedicated, access-restricted directory, and treated as secrets.
 - [ ] `--insecure-disable-tls-host-verification` is not set in production.
@@ -530,8 +534,8 @@ Reliability
 - [ ] One daemon per Python agent, or WebDriver sessions, or in-process pages. No shared default page between agents.
 - [ ] Pages are closed after each job; daemons are recycled on a schedule or memory threshold.
 - [ ] Health checks use `/json/version` (CDP) or `/status` (WebDriver).
-- [ ] The stop timeout is at least 15â€“30 s.
-- [ ] Navigation timeouts are set per call (`page.goto(url, { timeoutMs })`), not through `--http-timeout`.
+- [ ] The stop timeout is at least 15–30 s.
+- [ ] Navigation timeouts are set with `--http-timeout` / `network.timeoutMs`, or per call (`page.goto(url, { timeoutMs })`).
 - [ ] Your wrapper catches navigation errors, timeouts and `RobotsBlockedError`.
 
 Compliance and operations
@@ -540,5 +544,5 @@ Compliance and operations
 - [ ] `--obey-robots` is enabled for crawling, with a `--robots-agent` token that identifies you (see [network-and-proxies.md](./network-and-proxies.md#robotstxt)).
 - [ ] The target sites' terms of service permit automated access.
 - [ ] `ORBIS_NO_TELEMETRY=1` is set where outbound calls are not allowed, and in MCP configs.
-- [ ] The package version is pinned (`@memoracompany/memora-orbis@0.1.0`).
+- [ ] The package version is pinned (`@memoracompany/memora-orbis@0.2.0`).
 - [ ] You have reviewed [limitations.md](./limitations.md) for features your workflow depends on (iframes, shadow DOM, screenshots, file upload).

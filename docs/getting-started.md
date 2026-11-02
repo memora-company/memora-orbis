@@ -2,7 +2,7 @@
 
 This guide takes you from nothing to a working Orbis setup in about five minutes. You will install Orbis, check the installation, load a page from the command line, drive a page from TypeScript and from Python, and connect an existing Playwright or Selenium script. Each section ends with a link to the full reference.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -71,7 +71,7 @@ orbis --version
 Expected output:
 
 ```text
-0.1.0
+0.2.0
 ```
 
 If you installed locally instead of globally, use `npx orbis --version`. If you did not install at all, use `npx -y @memoracompany/memora-orbis --version`.
@@ -202,8 +202,8 @@ try {
   console.log(snap.actionMapText);
 
   // Type into fields by action ID or by any other locator.
-  agent.act('@1', 'ada@example.com');
-  agent.act('placeholder:Password', 'correct-horse');
+  await agent.act('@1', 'ada@example.com');
+  await agent.act('placeholder:Password', 'correct-horse');
 
   // See exactly what changed since the last snapshot.
   console.log(agent.diff().summary);
@@ -218,15 +218,15 @@ Output of the last line:
 === PAGE STATE DELTA ===
 
 Mutated (2 elements):
-  * [@1] [input] "Work email" (value: undefined -> "ada@example.com")
-  * [@2] [input] "Password" (value: undefined -> "correct-horse")
+  * [@1] [input] "Work email" (value: "[empty]" -> "[filled]")
+  * [@2] [input] "Password" (value: "[empty]" -> "[filled]")
 ```
 
 Three rules prevent most early mistakes:
 
-1. **`agent.act(target)` without text only fires a click event.** It does not follow links or submit forms. To navigate by clicking, use `await agent.page.activate(target)`, or submit with `fillForm()`. See [TypeScript SDK](./typescript-sdk.md).
-2. **`agent.fillForm(fields)` submits the form by default.** Pass `false` as the second argument to fill without submitting.
-3. **Typed values appear in later snapshots and diffs** (see the output above). Never send a password or token to a language model through the action map. See [Security](./security.md) and [Best practices](./best-practices.md).
+1. **`agent.act()` is async.** Always `await` it. Without text, it clicks like a real browser: it follows links and submits forms. See [TypeScript SDK](./typescript-sdk.md).
+2. **`agent.fillForm(fields)` only fills.** Pass `true` (or a submit button locator) as the second argument to submit the form as well.
+3. **Typed values are hidden from snapshots and diffs.** Filled text fields show `[FILLED]` in the action map and `[filled]` / `[empty]` in diffs, and password values are never included (see the output above). Still, fill credentials in code rather than through the model where you can. See [Security](./security.md) and [Best practices](./best-practices.md).
 
 Full API: [TypeScript SDK](./typescript-sdk.md). Locator syntax: [Locators](./locators.md).
 
@@ -243,9 +243,9 @@ npx -y @memoracompany/memora-orbis --port 9222
 You should see a banner that includes:
 
 ```text
-  â–¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  â–¶ Discovery Endpoint: http://localhost:9222/json/version
-  â–¶ Agent Snapshot:     http://localhost:9222/orbis/snapshot (or /memora/snapshot)
+  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  ▶ Discovery Endpoint: http://localhost:9222/json/version
+  ▶ Agent Snapshot:     http://localhost:9222/orbis/snapshot (or /memora/snapshot)
 ```
 
 In another terminal, install the SDK and run this script:
@@ -269,8 +269,8 @@ print(agent.diff()["diff"]["summary"])
 Important facts about the Python SDK:
 
 - Every Python client connected to the same daemon shares **one page**. Run one daemon per concurrent agent or worker.
-- Session file paths in `save_session()` and `load_session()` are paths on the **daemon's** machine.
-- `select_option()` does not work in 0.1.0 (the server has no matching endpoint). Use `agent.act("label:Country", "India")` instead, which selects the option on a `<select>`.
+- Session file paths in `save_session()` and `load_session()` are paths on the **daemon's** machine. They must be `.json` files inside the folder the daemon was started in (or `ORBIS_SESSION_DIR`, if set).
+- The default request timeout is 60 seconds. Change it with `OrbisAgent.connect(url, timeout=...)`.
 
 Full API, limits and workarounds: [Python SDK](./python-sdk.md).
 
@@ -343,11 +343,11 @@ Per-client steps and every tool: [MCP server](./mcp.md).
 
 ## 9. Before you go to production
 
-Orbis 0.1.0 has defaults that are fine on a laptop and unsafe on a server. Read [Security](./security.md) in full. The most important points:
+Orbis defaults are fine on a laptop, but a server needs more care. Read [Security](./security.md) in full. The most important points:
 
-- The CDP, REST and WebDriver servers listen on **all network interfaces** even when you pass `--host localhost`. Block the port with a firewall or a private container network.
-- The servers **do not check the API key** in 0.1.0. Anyone who can reach the port can control the browser, run JavaScript and read or write files through the session endpoints. Put an authenticating reverse proxy in front if the port is reachable by anything other than your own process.
-- The cookie store does not separate cookies by domain. Do not visit untrusted sites in a session that holds credentials.
+- The CDP, REST and WebDriver servers listen on `127.0.0.1` only by default (`--host localhost`). To accept connections from other machines or containers, pass `--host 0.0.0.0` explicitly, and then firewall the port.
+- Set `ORBIS_API_KEY` whenever the CDP/REST or WebDriver port is reachable by anything other than your own process. Every HTTP request and CDP connection must then send the key. Selenium can send it in the server URL: `http://orbis:<key>@host:9515`. See [Selenium / WebDriver](./selenium-webdriver.md).
+- Cookies are scoped by site like in a normal browser, but page scripts still run inside the Orbis process. Run Orbis in an isolated container when it visits sites you do not control.
 
 Then follow the checklist in [Production deployment](./production-deployment.md).
 

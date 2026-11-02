@@ -2,7 +2,7 @@
 
 Orbis serves a subset of the Chrome DevTools Protocol (CDP). Playwright's `chromium.connectOverCDP()` and Puppeteer's `puppeteer.connect()` can attach to it and drive pages through their normal APIs: navigation, selectors, `fill`, `click`, `evaluate`, extra headers. The engine underneath is not Chrome. It is the native Orbis engine, an HTML parser and DOM with a V8 script sandbox and no rendering. Code that depends on pixels, layout, frames or uploads behaves differently. This page shows how to connect, lists exactly which CDP methods are implemented, and records what was verified to work and fail against the 0.1.0 build.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -31,11 +31,11 @@ CDP is the default protocol, so `orbis --port 9222` and `orbis serve --protocol 
 The banner prints the endpoints:
 
 ```
-  Ã¢â€“Â¶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
-  Ã¢â€“Â¶ Discovery Endpoint: http://localhost:9222/json/version
+  ▶ CDP WebSocket:      ws://localhost:9222/devtools/browser/memora-root
+  ▶ Discovery Endpoint: http://localhost:9222/json/version
 ```
 
-> **Security:** with `--host localhost` (the default) or `--host 127.0.0.1`, the server actually listens on `0.0.0.0`, which is every network interface. No authentication is enforced. Anyone who can reach the port can drive the browser, read the page and use the session endpoints to read and write JSON files on the host. Firewall the port, or run the daemon in an isolated network namespace. See [security.md](./security.md).
+> **Security:** with `--host localhost` (the default) or `--host 127.0.0.1`, the server listens on `127.0.0.1` only. Use `--host 0.0.0.0` only when clients on other machines or containers must connect, and then set `ORBIS_API_KEY`. With a key set, CDP clients must send it, for example in the URL (`http://localhost:9222?apiKey=<key>`) or as an `x-api-key` / `Authorization: Bearer` header (Playwright: `connectOverCDP(url, { headers: { 'x-api-key': key } })`). See [security.md](./security.md).
 
 ## Connect with Playwright
 
@@ -121,31 +121,40 @@ Verified against the 0.1.0 build with Playwright 1.5x over CDP unless marked "by
 | `page.setExtraHTTPHeaders` / `context.setExtraHTTPHeaders` | Works | Applied to subsequent requests from that page. |
 | `navigator.webdriver` | `false` | With stealth on (default). |
 | `context.newPage()`, `browser.newContext()` | Works | Contexts are logical. They do not isolate storage (see below). |
-| `context.cookies()` | Returns `[]` | `Network.getCookies` / `Storage.getCookies` always return an empty list. |
-| `context.addCookies()` | Silently ignored | No error, but the cookie is not sent (verified). Set cookies via `document.cookie` in `evaluate`, or use the Orbis session APIs. |
-| `page.screenshot()`, `locator.screenshot()` | Returns a 1Ãƒâ€”1 transparent PNG | No rendering engine. The call succeeds so tools do not crash, but the image is blank. |
+| `context.cookies()`, `context.addCookies()`, `context.clearCookies()` | Works | Read, add and clear the context's cookies. Added cookies are sent on the next requests to their site. |
+| `page.screenshot()`, `locator.screenshot()` | Returns a 1×1 transparent PNG | No rendering engine. The call succeeds so tools do not crash, but the image is blank. |
 | `page.pdf()` | Fails | Throws a type error inside Playwright (no PDF data returned). |
 | `setInputFiles` (file upload) | Fails | `DOM.setFileInputFiles` throws "File uploads are not supported". |
 | `setViewportSize`, device emulation, geolocation, timezone, media | No effect | `Emulation.*` returns `{}`. Viewport metrics are fixed. |
 | `boundingBox()`, hover/click coordinates | Synthetic | Boxes come from a simplified internal layout, not CSS layout. `boundingBox()` may return `null`. Do not use for visual assertions. |
 | iframes | Not loaded | Only the top-level frame exists (`page.frames().length === 1`). |
 | Shadow DOM | Not supported | |
-| `page.route()` / request interception | Not supported | The `Fetch` domain is not implemented. |
+| `page.route()` / request interception | Works | `fulfill`, `continue` and `abort` work for navigations, scripts and page `fetch()` requests (CDP `Fetch` domain). |
+| `page.selectOption()` | Works | `<select>` value, `selectedIndex` and `options` behave like a browser. |
+| `page.on('console')` | Works | Console messages from page scripts are delivered as console events. |
 | `page.on('request' / 'response')` | Partial | Events fire for the main document only, not for subresources. |
-| `context.newCDPSession(page)` | **Crashes the Playwright client** | Playwright throws `Duplicate target <id>` from its target handling and the Node process exits. Use a raw WebSocket instead (see below). |
-| `browser.close()` | Closes **every** page on the daemon | Calls `Browser.close`, which closes all pages for all connected clients. The daemon keeps serving. |
-| Tracing, video, HAR recording | Not supported | Need rendering or the `Fetch` and `Tracing` domains. |
+| `context.newCDPSession(page)` | Works | Use it to call `Orbis.*` methods (see below). |
+| `browser.close()` | Closes only your pages | Calls `Browser.close`, which closes the pages this client created (`Target.createTarget`). Other clients' pages stay open, and the daemon keeps serving. |
+| Tracing, video, HAR recording | Not supported | Need rendering or the `Tracing` domain. |
 
 General rules:
 
-- **Orbis fits server-rendered pages.** Test suites against client-rendered single-page apps (React, Vue, Angular) will likely fail. The native engine's page runtime has no `XMLHttpRequest`, `WebSocket`, `requestAnimationFrame`, `IntersectionObserver`, `ResizeObserver`, `getComputedStyle`, `matchMedia`, `history`, `crypto`, `TextEncoder`, `atob`/`btoa` or `performance`, and `MutationObserver` is a stub. When a CDP client attaches, Orbis installs a compatibility layer (`src/cdp/dom-compat.ts`) that adds some DOM properties and classes Playwright needs. That layer is not a full browser runtime. See [limitations.md](./limitations.md) for the complete table.
+- **Orbis fits server-rendered pages.** Test suites against client-rendered single-page apps (React, Vue, Angular) will likely fail. The native engine's page runtime covers the common DOM APIs (including `XMLHttpRequest` (async only), `history`, event constructors, `element.style`, `getComputedStyle` and `requestAnimationFrame`), but has no `WebSocket`, `Worker`, `crypto`, `indexedDB`, `customElements` or `document.cookie`, and the observers (`MutationObserver`, `IntersectionObserver`, `ResizeObserver`) are stubs. When a CDP client attaches, Orbis installs a compatibility layer that adds some DOM properties and classes Playwright needs. That layer is not a full browser runtime. See [limitations.md](./limitations.md) for the complete table.
 - Anything visual (screenshots, PDFs, layout, pixel coordinates, CSS computed styles) is out of scope. Run those tests on real Chrome.
 - DOM-level automation (navigate, find, fill, click, read text, evaluate) is the supported surface.
 - See [limitations.md](./limitations.md) for engine-wide limits such as JavaScript support.
 
 ## Using Orbis features from a CDP client
 
-Orbis adds a custom CDP domain, `Orbis` (aliases `Memora` and `LP`), with the agent features. Because `context.newCDPSession()` crashes Playwright in 0.1.0, call it over a raw WebSocket on the page target:
+Orbis adds a custom CDP domain, `Orbis` (aliases `Memora` and `LP`), with the agent features. From Playwright, the simplest way is a CDP session:
+
+```typescript
+const cdp = await context.newCDPSession(page);
+const snap = await cdp.send('Orbis.getSemanticSnapshot' as any, { excludeSelectors: ['nav', 'footer'] });
+console.log((snap as any).actionMapText);
+```
+
+From any other client, call it over a raw WebSocket on the page target:
 
 ```typescript
 import WebSocket from 'ws';
@@ -190,14 +199,14 @@ ws.close();
 | `Orbis.getMarkdown` | `focusSelector?`, `excludeSelectors?` | `{ markdown }` |
 | `Orbis.getStructuredData` | none | `{ structuredData }` (meta, OpenGraph, Twitter, JSON-LD) |
 | `Orbis.diff` | `previousSnapshot?`, `focusSelector?`, `excludeSelectors?` | `{ diff, currentSnapshot }` |
-| `Orbis.fillForm` | `fields`, `submit?` (**defaults to `true`**), `submitActionId?`, `steps?` | `FormFillResult` plus `snapshot` |
-| `Orbis.saveSession` | `filePath?` | With `filePath`: writes the file on the daemon host. Without it: `{ success, session }` |
+| `Orbis.fillForm` | `fields`, `submit?` (defaults to `false`), `submitActionId?`, `steps?` | `FormFillResult` plus `snapshot` |
+| `Orbis.saveSession` | `filePath?` | With `filePath`: writes the file on the daemon host (a `.json` path inside the session folder). Without it: `{ success, session }` |
 | `Orbis.loadSession` | `filePath` or `session` | `{ success, url }` |
-| `Orbis.act` | `actionId`, `type` (`"click"` / `"type"`), `text?` | `{ success }`. Click dispatches the event only (no link navigation or form submit). |
+| `Orbis.act` | `actionId`, `type` (`"click"` / `"type"`), `text?` | `{ success }`. A click follows links and submits forms, like a real click. |
 
 The same features are also available over plain HTTP. See [http-api.md](./http-api.md).
 
-A raw WebSocket opened alongside Playwright on the same page is fine. Playwright's crash comes from its own `attachToTarget` handling, not from a second connection.
+A raw WebSocket opened alongside Playwright on the same page is fine.
 
 ## Implemented CDP methods
 
@@ -206,19 +215,20 @@ From `src/cdp/dispatcher.ts`. Any method in an unlisted domain returns `{}` with
 | Domain | Methods with behaviour |
 | :--- | :--- |
 | `Target` | `getTargets`, `createTarget`, `closeTarget`, `attachToTarget`, `detachFromTarget`, `setAutoAttach`, `setDiscoverTargets`, `getTargetInfo`, `createBrowserContext`, `getBrowserContexts`, `disposeBrowserContext` |
-| `Page` | `enable`, `getFrameTree`, `getResourceTree`, `addScriptToEvaluateOnNewDocument`, `removeScriptToEvaluateOnNewDocument`, `setLifecycleEventsEnabled`, `createIsolatedWorld`, `navigate`, `reload`, `stopLoading`, `getNavigationHistory`, `navigateToHistoryEntry`, `getLayoutMetrics` (fixed viewport), `captureScreenshot` (1Ãƒâ€”1 PNG) |
+| `Page` | `enable`, `getFrameTree`, `getResourceTree`, `addScriptToEvaluateOnNewDocument`, `removeScriptToEvaluateOnNewDocument`, `setLifecycleEventsEnabled`, `createIsolatedWorld`, `navigate`, `reload`, `stopLoading`, `getNavigationHistory`, `navigateToHistoryEntry`, `getLayoutMetrics` (fixed viewport), `captureScreenshot` (1×1 PNG) |
 | `Runtime` | `enable`, `evaluate` (`returnByValue`, `awaitPromise`), `callFunctionOn`, `getProperties`, `releaseObject`, `releaseObjectGroup`, `runIfWaitingForDebugger` |
 | `DOM` | `enable`, `disable`, `getDocument`, `querySelector`, `querySelectorAll`, `getOuterHTML`, `describeNode`, `resolveNode`, `requestNode`, `scrollIntoViewIfNeeded`, `getContentQuads`, `getBoxModel` (synthetic layout), `focus`, `setFileInputFiles` (throws) |
-| `Network` | `enable`, `setExtraHTTPHeaders`, `getCookies` / `getAllCookies` (always empty), `getResponseBody` (main document only) |
-| `Storage` | `getCookies` (always empty) |
+| `Network` | `enable`, `setExtraHTTPHeaders`, `getCookies`, `getAllCookies`, `setCookie`, `setCookies`, `deleteCookies`, `clearBrowserCookies`, `getResponseBody` (main document only) |
+| `Storage` | `getCookies`, `setCookies`, `clearCookies` (per browser context) |
+| `Fetch` | `enable`, `disable`, `continueRequest`, `fulfillRequest`, `failRequest` (navigations, scripts and page `fetch()`) |
 | `Input` | `dispatchMouseEvent`, `dispatchKeyEvent`, `insertText` |
-| `Browser` | `getVersion`, `close` (closes all pages) |
+| `Browser` | `getVersion`, `close` (closes the pages this client created) |
 | `Emulation` | all methods are no-ops |
 | `Orbis` / `Memora` / `LP` | see [above](#using-orbis-features-from-a-cdp-client) |
 
 Events emitted: `Target.targetCreated`, `Target.targetDestroyed`, `Target.attachedToTarget`, `Target.detachedFromTarget`, `Page.frameNavigated`, `Page.frameStartedLoading`, `Page.frameStoppedLoading`, `Page.frameRequestedNavigation`, `Page.domContentEventFired`, `Page.loadEventFired`, `Page.lifecycleEvent`, `Runtime.executionContextCreated`, `Runtime.executionContextsCleared`, `Network.requestWillBeSent`, `Network.responseReceived`, `Network.loadingFinished`.
 
-`Browser.getVersion` reports `product: "MemoraEngine/0.1.2"`, while `/json/version` reports `Browser: "Chrome/130.0.0.0"` for client compatibility.
+`Browser.getVersion` reports `product: "MemoraEngine/<version>"` (for example `MemoraEngine/0.2.0`), while `/json/version` reports `Browser: "Chrome/130.0.0.0"` for client compatibility.
 
 ## Discovery endpoints
 
@@ -226,7 +236,7 @@ Events emitted: `Target.targetCreated`, `Target.targetDestroyed`, `Target.attach
 | :--- | :--- |
 | `GET /json/version` | Browser info and `webSocketDebuggerUrl` (`ws://<host>:<port>/devtools/browser/memora-root`). |
 | `GET /json` or `/json/list` | All pages, each with `id`, `url`, `title` and `webSocketDebuggerUrl` (`/devtools/page/<id>`). |
-| `GET /json/new` | Creates a page and returns its target. |
+| `GET /json/new` | Creates a page and returns its target. `/json/new?<url>` (or `?url=<encoded url>`) opens that URL in the new page. |
 | `GET /json/close/<id>` | Closes a page. |
 
 The `webSocketDebuggerUrl` uses the `--host` value. If clients connect from another machine, start the daemon with `--host <reachable-name-or-ip>` so the advertised URLs are reachable. With `--host` set to a specific address, the server binds only to that address.
@@ -237,10 +247,10 @@ The same port also serves the agent REST API (`/orbis/*`). See [http-api.md](./h
 
 ## Concurrency and isolation
 
-- **Cookies are per page, not per context.** Each Orbis page has its own cookie jar. A login performed in one page is not visible in a second page, even in the same Playwright context. Keep a whole authenticated flow in one page, or move state with the session APIs ([sessions-and-auth.md](./sessions-and-auth.md)).
-- **Within one page's jar, cookies are not domain-scoped.** A cookie received from one host is sent to every host that page requests. Do not visit untrusted sites in a page that holds an authenticated session ([security.md](./security.md)).
-- **Contexts do not isolate anything.** `browser.newContext()` returns a logical context ID. Pages in different contexts are already isolated from each other in the same way pages in one context are (separate jars and storage).
-- **`browser.close()` affects every client.** It closes all pages on the daemon, including pages other clients are using. In shared setups call `browser.close()` only when you own the daemon. Otherwise close your own pages and disconnect.
+- **Cookies are shared within a context.** Pages in the same browser context share one cookie jar, like tabs in a browser: a login in one page is visible in another page of that context.
+- **Cookies are scoped by site.** Within a page's jar, a cookie is only sent to the site it belongs to (domain, path, `Secure` and expiry are honoured).
+- **Contexts isolate cookies.** `browser.newContext()` creates a separate cookie jar; pages in different contexts don't see each other's cookies. Storage is kept per page (tab) and origin.
+- **`browser.close()` affects only your pages.** It closes the pages your client created; pages other clients are using stay open.
 - **One daemon per test worker.** Run one daemon per Playwright worker or parallel job, each on its own port. That gives clean isolation and simple failure handling. See [production-deployment.md](./production-deployment.md).
 
 ## Running a Playwright test suite on Orbis
@@ -309,12 +319,6 @@ Keep visual tests (`toHaveScreenshot`) and upload tests in a separate project th
 
 ## Known issues
 
-> **Known issue (0.1.0):** `context.newCDPSession(page)` makes Playwright throw `Duplicate target <id>` and terminates the client process. Use a raw WebSocket to `webSocketDebuggerUrl` for `Orbis.*` calls.
-
-> **Known issue (0.1.0):** `context.addCookies()` and `context.cookies()` do nothing (`Network.getCookies` returns an empty list and cookie-setting methods are not implemented).
-
 > **Known issue (0.1.0):** `page.pdf()` fails with a Playwright type error instead of a clear "unsupported" message.
-
-> **Known issue (0.1.0):** The API key (`ORBIS_API_KEY` / `apiKey`) is read but never checked, and `localhost` binds to all interfaces.
 
 See also: [selenium-webdriver.md](./selenium-webdriver.md), [http-api.md](./http-api.md), [limitations.md](./limitations.md), [troubleshooting.md](./troubleshooting.md).

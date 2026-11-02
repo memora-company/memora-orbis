@@ -2,9 +2,9 @@
 
 This is the complete documentation for Orbis by Memora: a lightweight headless browser for AI agents and automation. It turns web pages into a compact, numbered action map plus clean Markdown, and it can be driven through a TypeScript SDK, a Python SDK, a REST API, the Chrome DevTools Protocol (Playwright and Puppeteer), W3C WebDriver (Selenium) and the Model Context Protocol (MCP).
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
-Every behaviour described in these pages was checked against the Orbis 0.1.2 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
+Every behaviour described in these pages was checked against the Orbis 0.2.0 source code, and the important ones were also run against the published build. Where Orbis has a known bug or limitation, the docs say so in a callout that starts with **Known issue**. Read those before you deploy.
 
 ---
 
@@ -14,6 +14,7 @@ Every behaviour described in these pages was checked against the Orbis 0.1.2 sou
 | :--- | :--- |
 | Install Orbis and run your first page in five minutes | [Getting started](./getting-started.md) |
 | Review version history and latest features | [Changelog](../CHANGELOG.md) |
+| Move to a newer version | [Upgrading](./upgrading.md) |
 | Understand how Orbis works and what the action map, diff, multi-tab contexts and fork are | [Concepts](./concepts.md) |
 | See complete, real-world examples you can adapt | [Use cases (cookbook)](./use-cases.md) |
 | Put Orbis into production safely | [Production deployment](./production-deployment.md) and [Security](./security.md) |
@@ -33,7 +34,7 @@ Every behaviour described in these pages was checked against the Orbis 0.1.2 sou
 
 | Document | What it covers |
 | :--- | :--- |
-| [MCP server](./mcp.md) | Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code; all 15 tools (16 with `memora_handoff`, unreleased) |
+| [MCP server](./mcp.md) | Claude Desktop, Claude Code, Cursor, Windsurf, Antigravity, VS Code; all 15 tools (16 with `memora_handoff` from 0.1.2, 17 with `memora_firewall` from 0.2.0) |
 | [Playwright and Puppeteer](./playwright-puppeteer.md) | Connecting over CDP, supported CDP methods, the custom `Orbis.*` CDP domain |
 | [Selenium / WebDriver](./selenium-webdriver.md) | W3C WebDriver server, supported and unsupported commands, pytest setup |
 | [Agent frameworks](./integrations.md) | LangChain, Browser-Use, Stagehand, CrewAI, OpenAI and Claude tool use |
@@ -44,9 +45,10 @@ Every behaviour described in these pages was checked against the Orbis 0.1.2 sou
 | :--- | :--- |
 | [Production deployment](./production-deployment.md) | Architecture choices, capacity, Docker, Kubernetes, systemd, timeouts, observability, launch checklist |
 | [Security](./security.md) | Threat model, network exposure, authentication, file access, cookie handling, hardening checklist |
+| [Prompt injection firewall](./prompt-injection-firewall.md) | Stop web pages from steering your agent: approvals for risky actions, allowed and blocked sites, activity log (0.2.0+) |
 | [Network and proxies](./network-and-proxies.md) | Proxies, headers, TLS, redirects, cookies, robots.txt |
 | [Stealth](./stealth.md) | Exactly what the stealth profile changes, and what it does not |
-| [CAPTCHAs, bot checks and rate limits](./challenges.md) | Detection, per-host cooldown, stop mode, human handoff (unreleased) |
+| [CAPTCHAs, bot checks and rate limits](./challenges.md) | Detection, per-host cooldown, stop mode, human handoff (0.1.2+) |
 | [Sessions and authentication](./sessions-and-auth.md) | Saving and restoring logins, session file format, token injection |
 | [Best practices](./best-practices.md) | Agent loop design, locator choice, waiting, retries, concurrency, responsible automation |
 | [Troubleshooting and FAQ](./troubleshooting.md) | Symptom, cause and fix for common problems |

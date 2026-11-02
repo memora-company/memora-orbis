@@ -13,9 +13,9 @@ npx -y @memoracompany/memora-orbis serve --protocol webdriver --port 9515
 The banner includes:
 
 ```text
-  â–¶ WebDriver URL:      http://localhost:9515
-  â–¶ Status:             http://localhost:9515/status
-  â–¶ Max Sessions:       16
+  ▶ WebDriver URL:      http://localhost:9515
+  ▶ Status:             http://localhost:9515/status
+  ▶ Max Sessions:       16
 ```
 
 There is no `--webdriver` flag: use `serve --protocol webdriver`. The legacy Grid prefix `/wd/hub` is also accepted, so `http://localhost:9515/wd/hub` works too.

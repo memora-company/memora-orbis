@@ -2,7 +2,7 @@
 
 This page explains how Orbis works: what kind of browser it is, what happens when it loads a page, how it turns a page into an action map and Markdown, how action IDs, diffs, forks and sessions behave, and which engine runs in which mode. Read it once before you build anything serious. Most surprises in production come from one of the rules described here.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -47,17 +47,17 @@ If a site only works with real rendering (canvas apps, heavy WebGL, layout-depen
 ## Architecture
 
 ```text
-                    Ã¢â€Å’Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Orbis process (Node.js) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Â
-                    Ã¢â€â€š                                                                              Ã¢â€â€š
- TypeScript SDK Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  OrbisAgent Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisBrowser Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisContext (Context / CookieJar isolation)Ã¢â€â€š
-                    Ã¢â€â€š                       Ã¢â€â€š              Ã¢â€â€š                                       Ã¢â€â€š
- REST  /orbis/*  Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  CDP server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Â¤              Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisPage (Tab 1: DOM, VM, fetch) Ã¢â€â€š
- CDP   /devtools Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  (HTTP + WebSocket)   Ã¢â€â€š              Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº OrbisPage (Tab 2: DOM, VM, fetch) Ã¢â€â€š
-                    Ã¢â€â€š                       Ã¢â€â€š                                                      Ã¢â€â€š
- WebDriver Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  WebDriver server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Ëœ                                                      Ã¢â€â€š
-                    Ã¢â€â€š                                                                              Ã¢â€â€š
- MCP (stdio) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“ÂºÃ¢â€â€š  MCP server Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Âº native engine or Chrome engine                               Ã¢â€â€š
-                    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€Ëœ
+                    ┌────────────────────────── Orbis process (Node.js) ───────────────────────────┐
+                    │                                                                              │
+ TypeScript SDK ───►│  OrbisAgent ──► OrbisBrowser ──► OrbisContext (Context / CookieJar isolation)│
+                    │                       │              │                                       │
+ REST  /orbis/*  ──►│  CDP server ──────────┤              ├──► OrbisPage (Tab 1: DOM, VM, fetch) │
+ CDP   /devtools ──►│  (HTTP + WebSocket)   │              └──► OrbisPage (Tab 2: DOM, VM, fetch) │
+                    │                       │                                                      │
+ WebDriver ────────►│  WebDriver server ────┘                                                      │
+                    │                                                                              │
+ MCP (stdio) ──────►│  MCP server ──► native engine or Chrome engine                               │
+                    └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **OrbisBrowser** holds contexts, pages and one shared connection pool. All pages share browser options and max concurrency guards.
@@ -83,31 +83,30 @@ When you call `goto(url)` (or a server receives a navigation), Orbis does the fo
 5. **Script redirects.** If a script assigned `window.location`, Orbis follows it (up to 5 times) and repeats the steps.
 6. **Ready.** `goto()` resolves with `{ status, url }`. `OrbisAgent.goto()` also returns the semantic snapshot.
 
-The default navigation timeout is 20 seconds for `page.goto()`. Pass a number or `{ timeoutMs }` as the second argument to change it per call. See [Network and proxies](./network-and-proxies.md).
-
-> **Known issue (0.1.0):** `--http-timeout` and `network.timeoutMs` do not change the navigation timeout. `page.goto()` always passes its own timeout (20 seconds unless you give one), which overrides them. A test with `orbis fetch --http-timeout 1000` against a page that responds after 3 seconds still loaded the page. Set the timeout on `goto()` in code; on the CLI there is currently no way to shorten it.
+The default navigation timeout is 20 seconds for `page.goto()`. Set a different default with `--http-timeout <ms>` on the CLI or `network.timeoutMs` in the SDK, or pass a number or `{ timeoutMs }` as the second argument to `goto()` to change it per call (a per-call value wins). See [Network and proxies](./network-and-proxies.md).
 
 ### JavaScript compatibility
 
-Page scripts run in a Node.js `vm` context with a DOM that implements the most common parts of the web platform, not all of it. The table below was produced by evaluating `typeof <name>` inside a page with the native engine (SDK use, no CDP client attached):
+Page scripts run in a Node.js `vm` context with a DOM that implements the most common parts of the web platform, not all of it. The table below was produced by evaluating `typeof <name>` inside a page. It is the same in every mode (SDKs, REST, WebDriver, MCP native engine and CDP):
 
-| Available to page scripts | Not available in 0.1.0 |
+| Available to page scripts | Not available |
 | :--- | :--- |
-| `document`, `window` (`self`, `top`, `parent`), `location`, `navigator`, `screen`, `console` | `XMLHttpRequest`, `WebSocket`, `Worker` |
-| `fetch`, `Headers`, `Request`, `Response`, `FormData`, `Blob`, `AbortController` | `history` (no `pushState`), `requestAnimationFrame`, `matchMedia`, `performance` |
-| `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `queueMicrotask` | `Event`, `CustomEvent` constructors, `structuredClone` |
-| `localStorage`, `sessionStorage` | `crypto`, `TextEncoder`, `atob`, `btoa` |
-| `URL`, `URLSearchParams`, `Promise`, `JSON`, `Intl` | `getComputedStyle`, `IntersectionObserver`, `ResizeObserver` |
-| `MutationObserver` (a stub: callbacks never fire) | `alert`, `confirm`, `prompt` |
+| `document`, `window` (`self`, `top`, `parent`), `location`, `navigator`, `screen`, `console` | `WebSocket`, `Worker` |
+| `fetch`, `Headers`, `Request`, `Response`, `FormData`, `Blob`, `AbortController` | `alert`, `confirm`, `prompt` |
+| `XMLHttpRequest` (built on `fetch`, async only), `history` (`pushState`, `replaceState`, `back`, `forward`) | `crypto`, `indexedDB`, `customElements` |
+| `Event`, `CustomEvent`, `MouseEvent`, `KeyboardEvent` and other event constructors, `EventTarget` | `document.cookie` |
+| `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `queueMicrotask`, `requestAnimationFrame`, `requestIdleCallback` | |
+| `getComputedStyle` (inline style plus defaults), `matchMedia`, `performance`, `IntersectionObserver` and `ResizeObserver` (stubs) | |
+| `atob`, `btoa`, `structuredClone`, `TextEncoder`, `TextDecoder` | |
+| `localStorage`, `sessionStorage`, `URL`, `URLSearchParams`, `Promise`, `JSON`, `Intl` | |
+| `MutationObserver` (a stub: callbacks never fire) | |
 
-On elements, `classList`, `appendChild`, `insertBefore`, `removeChild`, `append`, `prepend`, `innerHTML`, `outerHTML`, `textContent`, `value`, `getAttribute`/`setAttribute`, `addEventListener`, `closest`, `matches` and `getBoundingClientRect` are available. **`element.style`, `dataset`, `innerText`, `remove()` and `cloneNode()` are not.** When a CDP client (Playwright, Puppeteer) uses a page, Orbis installs a compatibility layer in that process that adds `style`, `getComputedStyle`, event constructors and reflected properties such as `hidden`, `checked` and `disabled`. Do not rely on it in SDK, REST, WebDriver or MCP use.
+On elements, `classList`, `style` (inline style), `dataset`, `appendChild`, `insertBefore`, `removeChild`, `remove()`, `cloneNode()`, `append`, `prepend`, `innerHTML`, `outerHTML`, `innerText`, `textContent`, `value`, `getAttribute`/`setAttribute`, `addEventListener`, `focus`, `blur`, `closest`, `matches` and `getBoundingClientRect` are available. `<select>` elements support `value`, `selectedIndex` and `options`, and `<option>` elements support `text`, `label` and `index`, as in a browser. **`insertAdjacentHTML`, `replaceChild` and iframe `contentDocument` are not available.**
 
 What this means in practice:
 
-- A script that does `el.style.display = 'block'` throws `TypeError: Cannot set properties of undefined`. The rest of that handler does not run, so content it would have shown stays hidden.
-- `element.value` only reflects the `value` attribute. For a `<select>`, page scripts always read `''`, so handlers like `onchange="load(this.value)"` get an empty string. Orbis's own `selectOption()` and form submission handle selects correctly.
-- Many large client-rendered applications (React, Vue, Angular bundles, analytics libraries) depend on missing APIs and may render nothing. Server-rendered pages work well.
-- **The sandbox is not a security boundary.** Page scripts run in a Node.js `vm` context, and a page can reach the host's `process` object through standard JavaScript tricks (verified in 0.1.0). Any site Orbis loads can run code with the privileges of the Orbis process. Run Orbis in an isolated container without secrets when it visits sites you do not control. See [Security](./security.md).
+- DOM coverage is still not complete. Many large client-rendered applications (React, Vue, Angular bundles, analytics libraries) depend on missing APIs and may render nothing; for those, use the Chrome engine. Server-rendered pages work well.
+- **The sandbox is hardened, but it is not a perfect security boundary.** Page scripts run in a Node.js `vm` context. The known ways for page JavaScript to reach the host Node.js process are blocked (for example, `document.constructor.constructor('return process')()` throws an `EvalError`). For high-assurance setups, still run Orbis in an isolated container or VM without secrets when it visits sites you do not control. See [Security](./security.md).
 - Script errors do not stop Orbis. They are written to the page console. Read them with `page.getLogs()`, the `memora_console` MCP tool, or watch stderr for `[MemoraDOM] Error in ... handler`.
 - Before you build on a site, run `orbis fetch <url> --dump action_map` and check that the elements you need are listed. If they are not, use a full browser for that site or, with MCP, `--engine chrome`.
 
@@ -161,10 +160,9 @@ Each action line has this format:
 ```
 
 - **role** is the `role` attribute if present, otherwise `link` for `a`, `button` for `button`, or the tag name.
-- **text** is the first non-empty value of `aria-label`, `placeholder`, `title`, `value`, then the element's text. Whitespace is collapsed and the text is cut at 80 characters. If all are empty, it is `[Untitled <tag>]`.
-- **The text of a `<label>` is not used.** An input that only has a `<label for>` shows as `[Untitled input]`. The `label:` locator still finds it. See [Locators](./locators.md).
+- **text** is the element's name, taken from `aria-label`, an associated `<label>` (`<label for>` or a wrapping label), `placeholder`, `title` or the element's text. Text you type into a field never becomes its name. Whitespace is collapsed and the text is cut at 80 characters. If all are empty, it is `[Untitled <tag>]`.
 - **selector** is a CSS selector unique in the document, chosen in this order: `#id`, test ID attributes (`data-testid`, `data-test-id`, `data-qa`, `data-cy`), `tag[name]`, `tag[aria-label]`, `tag[placeholder]`, a unique class, then a path with `:nth-of-type()`.
-- **value** reflects the current value, including values you typed. This means typed passwords appear in the action map. See [Security](./security.md).
+- **value** is not shown for text fields you filled: they show `[FILLED]` instead, and password values are never included. See [Security](./security.md).
 
 ## Action IDs
 
@@ -173,15 +171,15 @@ Action IDs (`@1`, `@2`, ...) are short handles for the elements in a snapshot. T
 The rules:
 
 1. **They are positional.** IDs are assigned in document order, starting at `@1`, every time a snapshot is taken.
-2. **They are recomputed when you use them.** When you act on `@3`, Orbis takes a fresh snapshot of the **whole document** and uses the third element of that snapshot. If the page changed since the model saw the map (a script added a banner, a dropdown opened), `@3` can point to a different element.
-3. **Focused or filtered snapshots use different numbers.** A snapshot taken with `focusSelector` or `excludeSelectors` numbers only the elements it includes, but acting on an ID always resolves against the full, unfiltered document. Do not act on IDs taken from a focused or filtered snapshot. Use the `selector` field of the action instead, or use filters only for the Markdown you send to the model.
+2. **They refer to the latest snapshot.** When you act on `@3`, Orbis uses the element shown as `@3` in the latest snapshot of the page. If there is no snapshot for the current page (for example after a navigation), it takes a fresh one and uses its third element.
+3. **Focused or filtered snapshots use their own numbers.** A snapshot taken with `focusSelector` or `excludeSelectors` numbers only the elements it includes, and acting on an ID from that snapshot resolves to the element shown there.
 4. **Hidden elements are not numbered** (with the default `filterHidden`).
 
 Practical consequences:
 
 - Take a new snapshot (or a diff) after every action, and give the model only the latest map.
 - For scripted, deterministic automation, prefer stable locators (`label:`, `testid:`, `#id`, the action's `selector`).
-- Semantic aliases such as `@email` match by name, placeholder, text or selector substring and are less sensitive to position. See [Locators](./locators.md).
+- Semantic aliases such as `@email` pick the best match by name, id, type, placeholder or text (exact matches and form fields first) and are less sensitive to position. See [Locators](./locators.md).
 
 ## Markdown output
 
@@ -215,7 +213,7 @@ How it works:
 - Elements are matched between snapshots by their generated **selector**.
 - Mutations are tracked for `text`, `value`, `disabled`, `checked`, `expanded` and `selected`.
 - If there is no previous snapshot, the diff reports an "Initial page load" and lists every action as added.
-- **Every snapshot and every diff replaces the baseline.** Resolving an `@ID` or an `@alias` also takes a snapshot, so the baseline becomes the state just before that action. Calling `diff()` twice in a row returns "No visual, DOM, or interactive changes detected." the second time.
+- **Every snapshot and every diff replaces the baseline.** Resolving an `@ID` or an `@alias` does not move the baseline, so `diff()` after an action compares against your last snapshot. Calling `diff()` twice in a row returns "No visual, DOM, or interactive changes detected." the second time.
 
 Example summary:
 
@@ -229,7 +227,7 @@ Added (2 elements):
   + [@5] [button] "Pay now" (selector: #pay)
 
 Mutated (1 elements):
-  * [@2] [input] "Promo code" (value: undefined -> "SPRING")
+  * [@2] [input] "Promo code" (value: "[empty]" -> "[filled]")
 ```
 
 Diffs are usually much shorter than a full snapshot, which makes them a good thing to send to a model after each step of a multi-step task.
@@ -255,7 +253,7 @@ Other facts:
 - Forking is extremely fast. It serializes and re-parses the DOM in memory: about 5 ms on standard test pages.
 - After forking, the two pages do not affect each other. Navigations in a fork make their own network requests.
 
-Forks work well for reading, extracting, filling forms, following plain links (`activate()` on an `<a href>`) and submitting standard HTML forms. They are not suitable for interactions that depend on JavaScript event handlers.
+Forks work well for reading, extracting, filling forms, following plain links (`act()` on an `<a href>`) and submitting standard HTML forms. Closing a fork (`await fork.close()`) closes only the fork's page. They are not suitable for interactions that depend on JavaScript event handlers.
 
 ## Sessions
 
@@ -267,14 +265,17 @@ A session is the authentication state of a page: cookies, `localStorage` and `se
   "createdAt": "2026-10-31T09:12:44.120Z",
   "url": "https://app.example.com/dashboard",
   "cookies": { "sid": "..." },
+  "cookieList": [ { "name": "sid", "value": "...", "domain": "app.example.com", "hostOnly": true, "path": "/", "secure": true, "httpOnly": true } ],
   "localStorage": { "auth_token": "..." },
   "sessionStorage": {}
 }
 ```
 
+`cookieList` stores each cookie together with its site. Session files from older versions only have the `cookies` map; when you load one, those cookies are applied to the site in the file's `url`.
+
 Restoring a session sets cookies and storage. It does **not** navigate: call `goto()` afterwards. Session files contain live credentials; store them like passwords. See [Sessions and authentication](./sessions-and-auth.md).
 
-> **Note on Storage:** With the native engine, `localStorage` and `sessionStorage` belong to the current document and are reset on every navigation. Cookies survive navigation; restored storage does not. Cookie-based logins work reliably across navigations.
+> **Note on Storage:** `localStorage` and `sessionStorage` persist across navigations within the same origin (per page or tab), and each origin has its own storage, as in a browser.
 
 > **Note on Cookies:** Orbis introduces an isolated, domain-aware `CookieJar` (RFC 6265 compliant). Cookies are scoped per-domain and per-context. Parallel agent personas operating in different contexts (`agent.newContext()`) or isolated tabs (`agent.newTab({ isolated: true })`) maintain completely separate cookie jars.
 
@@ -298,9 +299,9 @@ How many pages exist depends on how you use Orbis. This matters for concurrency:
 | Mode | Pages | Safe for concurrent users? |
 | :--- | :--- | :--- |
 | `OrbisAgent.launch()` | Multiple tabs and isolated contexts (`tabs`, `newTab()`, `newContext()`) | Yes. Supports multi-tab concurrency and multi-agent context isolation |
-| REST API and Python SDK | Endpoints use the daemon's **default page** unless you pass `?id=`; `/orbis/goto` always uses the default page | No. Run one daemon per concurrent agent |
-| CDP (Playwright, Puppeteer) | One page per target created by the client; supports CDP `Target.createBrowserContext` | Yes, within limits. `Browser.close` from one client closes all pages |
-| WebDriver (Selenium) | One page per session; at most 16 sessions by default; idle sessions closed after 5 minutes | Yes |
+| REST API and Python SDK | Endpoints use the daemon's **default page** unless you pass `?id=` | No. Run one daemon per concurrent agent |
+| CDP (Playwright, Puppeteer) | One page per target created by the client; supports CDP `Target.createBrowserContext` | Yes, within limits. `Browser.close` from one client closes only the pages that client created |
+| WebDriver (Selenium) | One page per session; at most 16 sessions by default; idle sessions closed after 5 minutes (`--session-idle-timeout`, 0 disables) | Yes |
 | MCP | One active page per server process | One client per process (the normal MCP model) |
 
 See [Production deployment](./production-deployment.md) for sizing and isolation patterns.
@@ -313,7 +314,7 @@ These numbers were measured by the Orbis team. They are not guarantees. Measure 
 | :--- | :--- | :--- |
 | Time to load 200 local test pages one after another | 0.31 s (headless Chrome: 3.4 s) | Windows 11 laptop, median of 3 runs, October 2026, timed after the browser started |
 | Memory with 10 tabs open | 107 MB (headless Chrome: 1,154 MB) | Same machine; Orbis = Node.js RSS, Chrome = Playwright headless shell working set |
-| Tokens of distilled output vs raw HTML | 33Ã¢â‚¬â€œ40% fewer (37% average) | The four HTML fixtures in the Orbis benchmark |
+| Tokens of distilled output vs raw HTML | 33–40% fewer (37% average) | The four HTML fixtures in the Orbis benchmark |
 | Parse page and build action map plus Markdown | About 4 ms average | Same four fixtures |
 | Fork a page | 4.9 ms | Orbis test fixture |
 

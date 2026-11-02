@@ -6,6 +6,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.2.0]
+
+Upgrading? The [upgrade guide](./docs/upgrading.md) lists what to check, especially if you come from 0.1.0 or 0.1.1.
+
+### Security
+- **Fixed: a web page could read files from the computer running Orbis.** By loading a JavaScript module with a computed path, a page could make the native engine read files from the folder Orbis was started in (and folders above it), then send them elsewhere. Such module imports are now refused. Some pages could also crash the whole process this way; a module that fails to load is now reported in the page's console instead. **All 0.1.x users should upgrade.**
+
+### Added
+- **Prompt injection firewall** (off by default; turn on with `--firewall standard` or `strict`). Risky actions such as running JavaScript, reading cookies or storage, using session files and submitting forms ask you before they run. You can limit your agent to sites you allow, and email, banking, account-settings and admin sites are blocked by default. Page text reaches the model labelled as untrusted, common injection phrases and hidden text are flagged or removed, and every action can be written to a signed activity log. See the [guide](./docs/prompt-injection-firewall.md).
+- `orbis firewall scan <url>`, `orbis firewall verify <file>`, `orbis firewall policy`, and the read-only `memora_firewall` MCP tool.
+- Site rules for every mode: `--allow-domain`, `--block-domain`, `--block-sensitive-domains`.
+- Python SDK: `FirewallBlockedError`.
+
+### Changed (may need action, see the upgrade guide)
+- `page.click()` and `agent.act()` are async and follow links / submit forms like a real click.
+- `fillForm()` (TypeScript, Python, REST, LangChain) no longer submits unless asked.
+- `OrbisAgent.connect(url)` returns a `RemoteOrbisAgent` that drives the remote daemon (before, it ran a local browser).
+- `--host localhost` binds `127.0.0.1` only; use `--host 0.0.0.0` for containers.
+- The API key is enforced on HTTP and WebSocket; requests from web pages in a browser are refused (no CORS).
+- Session files over the network or MCP must be `.json` files inside the server's folder or `ORBIS_SESSION_DIR`.
+- Cookies are scoped per site (domain, path, Secure, expiry); session files gain `cookieList`.
+- Action maps show `[FILLED]` instead of typed values; passwords are never included.
+- `orbis fetch` and `--eval` exit 1 on HTTP 4xx/5xx or failure.
+- Python SDK default timeout is 60 s, configurable.
+- JavaScript module imports with a computed path (`import("./" + name)`) are refused in the native engine (see Security).
+- The MCP server supports protocol versions up to 2025-11-25 and answers clients that ask for an unknown version with the newest one it supports (it used to answer 2024-11-05).
+- MCP `memora_eval` (native engine) awaits promises (up to 10 s) and returns plain values like the Chrome engine (strings as-is, other values as JSON) instead of `{type, value}`; thrown or rejected errors are tool errors.
+- `fillForm()` returns `success: false` when a field was not found (listed in `skipped`) or a requested submit did not happen; a multi-step fill succeeds only if every step did.
+- The WebDriver server requires the API key when `ORBIS_API_KEY` is set (`x-api-key`, `Authorization: Bearer`, Basic auth with the key as password, or `?apiKey=`); missing or wrong key gives HTTP 401, cross-site browser requests get 403. In Selenium use `http://orbis:KEY@host:port`.
+
+### Fixed
+All known issues of 0.1.x (full list in [limitations.md](./docs/limitations.md#10-issues-fixed-in-020)), including:
+- Security: page scripts could reach the host Node.js process through `constructor` chains (known routes now blocked); the server listened on all interfaces; the API key was not checked; session endpoints wrote anywhere; cookies leaked between sites.
+- `--http-proxy` and `--http-timeout` now work; `Crawl-delay` is honoured with `--obey-robots`.
+- Page scripts get `XMLHttpRequest`, `history`, `Event` constructors, `element.style`, `dataset`, `remove()`; `select.value` works; storage survives navigation.
+- Locators: `<label>` names inputs, `label:` is case-insensitive, `role:link` matches `<a>`, `@alias` picks the best match, IDs from filtered snapshots resolve correctly.
+- Playwright: `newCDPSession`, `page.route()`, `page.selectOption()` and console events work; `Browser.close` closes only the caller's pages.
+- MCP tool calls run in order; update notices go to stderr; `--engine chrome` without Chrome gives a clear error.
+- `goto('about:blank')`, `extract()` attributes, `waitForFunction(string)`, fork `close()`, REST `/orbis/goto?id=`, REST `act` diff baseline, Python `select_option()`.
+- Chrome engine: after a navigation was blocked (by robots.txt or the firewall), the next navigation could fail with "interrupted by another navigation".
+- Broken characters (such as `â€”`) in CLI help and messages.
+- MCP `memora_eval` (native engine) awaits promises; `memora_diff` shows changes made by `memora_act` and `memora_fill_form`; tool descriptions no longer claim "95% token savings".
+- HTML output (`page.content()`, `orbis fetch --dump html`, REST and MCP) starts with `<!DOCTYPE html>` instead of a `<#document>` wrapper.
+- `fillForm()` no longer reports success when fields were skipped or a requested submit did not happen.
+- `new OrbisBrowser({ timeout })` sets the default navigation timeout.
+- Playwright `context.addCookies()`, `cookies()` and `clearCookies()` work (CDP `Storage` and `Network` cookie methods, per browser context).
+- REST endpoints answer a wrong HTTP method with 405 and an `Allow` header (before, `/orbis/session` hung and POST-only routes gave 404).
+- `/json/new?<url>` opens the new tab at that URL and returns its URL and title.
+- The WebDriver server checks the API key; its idle session timeout is configurable with `--session-idle-timeout <sec>` (default 300, `0` disables).
+- Python `fill_form()` accepts a submit selector (`submit: Union[bool, str]`); PyPI metadata lists "Other/Proprietary License" instead of MIT.
+
+### Performance
+Measured on a Windows 11 laptop (Node 22), 0.1.2 and 0.2.0 run on the same machine.
+
+
+| What | 0.1.2 | 0.2.0 | Result |
+|---|---|---|---|
+| Action map for nodejs.org (thousands of links) | over 120 s (looked stuck) | about 93 ms | Much faster |
+| Engine memory at start | 79.6 MB | 73.6 MB | About 6 MB less |
+
+---
+
 ## [0.1.2] - 2026-10-31
 
 ### Changed
@@ -104,13 +166,13 @@ agent.closeTab(adminTab.id);
 
 ### Initial Release
 
-The initial public evaluation release of **Orbis by Memora** â€” the lightweight headless browser built from the ground up for autonomous AI agents.
+The initial public evaluation release of **Orbis by Memora** — the lightweight headless browser built from the ground up for autonomous AI agents.
 
 ### Core Features
 
 - **No-Render Headless Engine:** Downloads HTML, constructs the DOM, and executes JavaScript in an isolated V8 sandbox without layout or painting overhead. Runs in ~107 MB RAM across 10 tabs (vs >1,100 MB for Headless Chrome).
 - **Interactive Action Map:** Automatically annotates interactive controls with numbered action IDs (`@1`, `@2`, `@email`), HTML roles, labels, and CSS selectors.
-- **Markdown Distillation:** Produces clean, token-efficient Markdown representations of web content, saving 33â€“40% tokens compared to raw HTML.
+- **Markdown Distillation:** Produces clean, token-efficient Markdown representations of web content, saving 33–40% tokens compared to raw HTML.
 - **10-Strategy Locator Engine:** Resolves elements by:
   1. Action ID (`@1`, `@2`)
   2. Semantic alias (`@email`, `@submit`)

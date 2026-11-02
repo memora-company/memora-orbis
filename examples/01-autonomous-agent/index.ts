@@ -90,7 +90,7 @@ async function main() {
   try {
     // 1. Load the login page
     const login = await agent.goto(`${BASE}/login`);
-    console.log(`1. Loaded "${login.title}" â€” ${login.interactiveCount} actions, ~${login.tokenEstimate} tokens`);
+    console.log(`1. Loaded "${login.title}" — ${login.interactiveCount} actions, ~${login.tokenEstimate} tokens`);
     console.log(login.actionMapText, '\n');
 
     // 2. Compact map you would give to a language model

@@ -1,8 +1,8 @@
 # CLI Reference
 
-This page documents every command, flag, environment variable and exit code of the `orbis` command-line tool. The behaviour described here comes from the 0.1.0 source (`src/cli/index.ts`), not from marketing copy. Where a flag is accepted but does nothing useful, or has a known bug, that is called out explicitly.
+This page documents every command, flag, environment variable and exit code of the `orbis` command-line tool. The behaviour described here comes from the source, not from marketing copy. Where a flag is accepted but does nothing useful, or has a known bug, that is called out explicitly.
 
-Applies to: Orbis 0.1.2 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
+Applies to: Orbis 0.2.0 (`@memoracompany/memora-orbis` on npm, `memora-orbis` on PyPI)
 
 ## Contents
 
@@ -57,9 +57,12 @@ Requirements: Node.js 20 or 22 (the versions the project's CI tests against).
 orbis [options]                 Start the CDP (default) or WebDriver server, or run --eval / --mcp
 orbis serve [options]           Start the CDP or WebDriver server (same as the root command, minus --eval/--mcp)
 orbis fetch [options] <url>     Load one URL and print it as Markdown, HTML, action map or structured data
+orbis firewall scan <url>       (0.2.0+) Check a page for prompt-injection text
+orbis firewall verify <file>    (0.2.0+) Check that a firewall activity log was not edited
+orbis firewall policy [options] (0.2.0+) Print the firewall settings that your flags produce
 ```
 
-Global options available everywhere: `--help` prints help; `-V, --version` (root only) prints `0.1.0`.
+Global options available everywhere: `--help` prints help; `-V, --version` (root only) prints the installed version, for example `0.2.0`.
 
 ---
 
@@ -136,11 +139,11 @@ All [network options](#network-options) are also accepted.
 | `--dump` value | Alias | Output |
 | :--- | :--- | :--- |
 | `markdown` | `md` | Token-efficient Markdown of the visible content. |
-| `html` | | The serialized DOM **after** scripts ran (not the raw HTTP response body). |
+| `html` | | The serialized DOM **after** scripts ran (not the raw HTTP response body), starting with `<!DOCTYPE html>`. |
 | `structured_data` | `metadata` | Pretty-printed JSON: `url`, `title`, `description`, `canonical`, `openGraph`, `twitter`, `meta`, `jsonLd`. |
 | `action_map` | `semantic_tree` | A header with title, URL, token estimate and action count, followed by the numbered action map. Both names produce identical output. The token estimate is `ceil(characters / 4)` over title, action map and Markdown, not a tokenizer count, and on link-dense pages it can exceed the raw HTML (each line carries a full CSS selector). See [best-practices.md](./best-practices.md) for keeping prompts small. |
 
-> **Known issue (0.1.0):** `--dump html` output is wrapped in a literal `<#document>` ... `</#document>` pair, because it prints `document.outerHTML` of the document node. Strip the first and last line (or the wrapper tags) if you need clean HTML.
+> **Changed in 0.2.0:** in 0.1.x, `--dump html` output was wrapped in `<#document>` ... `</#document>` tags. It is now plain HTML that starts with `<!DOCTYPE html>`, so remove any code that strips the wrapper.
 
 ### Fetch examples
 
@@ -172,9 +175,11 @@ orbis fetch https://staging.internal --insecure-disable-tls-host-verification
 HTTPS_PROXY=http://proxy.corp:3128 orbis fetch https://example.com --use-env-proxy
 ```
 
-Exit status: 0 on success (including HTTP 4xx/5xx responses, which are not treated as errors), 1 if the request itself fails (DNS, TLS, timeout, robots.txt block, invalid flag), with `Fetch error: <reason>` on stderr.
+Exit status: 0 on success, 1 if the request itself fails (DNS, TLS, timeout, robots.txt block, invalid flag), with `Fetch error: <reason>` on stderr.
 
-Unreleased builds also print a `# CHALLENGE DETECTED` block to stderr when the page is a CAPTCHA/bot challenge, block page or 429 (exit stays 0), and exit 1 for it with `--on-challenge stop` or while the host is in cooldown. See [challenges.md](./challenges.md).
+> **Changed in 0.2.0:** `orbis fetch` exits 1 when the page answers with HTTP 4xx or 5xx. The page is still printed to stdout, and a line `HTTP <status> from <url>` goes to stderr. Earlier versions exited 0.
+
+From 0.1.2, Orbis also prints a `# CHALLENGE DETECTED` block to stderr when the page is a CAPTCHA/bot challenge, block page or 429 (exit stays 0), and exit 1 for it with `--on-challenge stop` or while the host is in cooldown. See [challenges.md](./challenges.md).
 
 ---
 
@@ -191,14 +196,23 @@ Accepted by the root command and `serve`.
 | `--protocol <protocol>` | `cdp` \| `webdriver` | `cdp` | server | Which automation protocol to serve. Any other value exits with `Unknown --protocol`. |
 | `--engine <engine>` | `auto` \| `native` \| `chrome` | `auto` | **`--mcp` only** | Backend for the MCP server. `native`: the built-in Orbis engine. `chrome`: a headless system Chrome/Edge driven through Playwright. `auto`: Chrome/Edge if one is found at a known install path, otherwise native. Ignored in CDP, WebDriver, `--eval` and `fetch` modes, which always use the native engine. |
 | `--max-sessions <number>` | integer | `16` | **WebDriver only** | Maximum concurrent WebDriver sessions. When reached, `POST /session` fails with `session not created`. Ignored by the CDP server. |
+| `--session-idle-timeout <sec>` | integer ≥ 0 | `300` | **WebDriver only** | Added in 0.2.0. Close a WebDriver session after this many seconds without a command. `0` turns the idle timeout off. |
 | `--no-stealth` | flag | stealth on | CDP, WebDriver, `--eval` | Disable the JavaScript fingerprint script. Ignored in `--mcp` mode (the MCP native engine always enables stealth). Does not change HTTP headers. See [stealth.md](./stealth.md). |
 | `--eval <url>` | URL | | root only | One-shot mode (see above). |
 | `--mcp` | flag | | root only | MCP stdio mode (see above). |
-| `--handoff-timeout <sec>` | integer â‰¥ 10 | `300` | root only, with `--mcp` | Unreleased. Seconds a person gets to complete a check in the `memora_handoff` window. Invalid values exit 1. See [challenges.md](./challenges.md#5-human-handoff-mcp). |
+| `--handoff-timeout <sec>` | integer ≥ 10 | `300` | root only, with `--mcp` | Added in 0.1.2. Seconds a person gets to complete a check in the `memora_handoff` window. Invalid values exit 1. See [challenges.md](./challenges.md#5-human-handoff-mcp). |
+| `--firewall <level>` | `off` \| `standard` \| `strict` | `off` | root, `serve` | Added in 0.2.0. Turn on the [prompt injection firewall](./prompt-injection-firewall.md). With CDP or WebDriver only the site rules apply. |
+| `--firewall-policy <file>` | path | | root, `serve` | Added in 0.2.0. Firewall settings from a JSON file; other flags override it. |
+| `--firewall-mode <mode>` | `enforce` \| `monitor` | `enforce` | root, `serve` | Added in 0.2.0. `monitor` logs what would be blocked and blocks nothing. |
+| `--firewall-allow <action>` | action, repeatable | | root, `serve` | Added in 0.2.0. Let this action run without asking. Actions: `read`, `navigate`, `interact`, `submit`, `storage`, `cookies`, `script`, `session`, `download`. |
+| `--firewall-confirm <action>` | action, repeatable | | root, `serve` | Added in 0.2.0. Ask you before this action runs. |
+| `--firewall-deny <action>` | action, repeatable | | root, `serve` | Added in 0.2.0. Always refuse this action. |
+| `--audit-log <file>` | path | | root, `serve` | Added in 0.2.0. Write the firewall activity log here. Set `ORBIS_AUDIT_KEY` to sign it. |
+| `--confirm-timeout <sec>` | integer ≥ 5 | `120` | root, with `--mcp` | Added in 0.2.0. How long to wait for you to approve an action before refusing it. |
 
-> **Bind address warning.** When `--host` is `localhost` or `127.0.0.1` (including the default), the CDP and WebDriver servers bind to **`0.0.0.0`, i.e. every network interface**, not just loopback. Any machine that can reach the port can drive the browser, read cookies and read/write files through the session endpoints. Any other `--host` value (for example `::1` or a specific interface IP) is bound as given. Read [security.md](./security.md) before running a server on a shared or public network.
+> **Changed in 0.2.0:** `--host localhost` (the default) and `--host 127.0.0.1` bind to `127.0.0.1` only, so other machines and containers cannot connect. To accept connections from other machines (for example in Docker or Kubernetes), pass `--host 0.0.0.0` explicitly. `--host ::1` binds to the IPv6 loopback, and printed URLs show `[::1]`. Any other `--host` value is bound as given. Read [security.md](./security.md) before running a server on a shared or public network.
 
-WebDriver sessions that receive no command for **5 minutes** are closed automatically. This idle timeout is fixed in 0.1.0 and cannot be changed from the CLI.
+WebDriver sessions that receive no command for **5 minutes** are closed automatically. Change this with `--session-idle-timeout <sec>` (`0` turns it off).
 
 ### Network options
 
@@ -206,22 +220,23 @@ Accepted by the root command, `serve` and `fetch`. They configure every HTTP req
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--http-proxy <url>` | URL | | **Not functional in 0.1.0.** Reserved for the upcoming Orbis Cloud managed proxy network. Passing it only prints an "Orbis Cloud (Coming Soon)" notice to stderr; the value is **not** used to route traffic. To use your own proxy, use `--use-env-proxy` (below) or the `network.proxy` option in the [TypeScript SDK](./typescript-sdk.md). |
-| `--proxy-bearer-token <token>` | string | | Sends `Proxy-Authorization: Bearer <token>` to an `http://`/`https://` proxy. Because `--http-proxy` is inert, this only has an effect together with `--use-env-proxy`. Rejected with SOCKS proxies; ignored by the Chrome MCP engine. |
+| `--http-proxy <url>` | URL | | Send all traffic through this proxy. `http://` sites are sent as plain forward-proxy requests, `https://` sites through `CONNECT`. It also prints an Orbis Cloud notice to stderr, which you can ignore. In the SDK, use the `network.proxy` option of the [TypeScript SDK](./typescript-sdk.md). |
+| `--proxy-bearer-token <token>` | string | | Sends `Proxy-Authorization: Bearer <token>` to an `http://`/`https://` proxy set with `--http-proxy` or `--use-env-proxy`. Rejected with SOCKS proxies; ignored by the Chrome MCP engine. |
 | `--proxy-bypass <hosts>` | comma list | | Hosts that skip the proxy, NO_PROXY syntax: `*`, `example.com` (host and subdomains), `.example.com` / `*.example.com` (subdomains), `host:port`. |
 | `--use-env-proxy` | flag | off | Use `HTTPS_PROXY` (https URLs) or `HTTP_PROXY` (http URLs), falling back to `ALL_PROXY`; honour `NO_PROXY`. Lower-case variants are also read. Supported schemes: `http://`, `https://`, `socks5://`, `socks5h://`, `socks://`. Credentials go in the URL (`http://user:pass@host:3128`). |
 | `--http-header <header>` | `"Name: Value"`, repeatable | `[]` | Extra header on every request, to **every host**. Overrides the built-in browser headers of the same name. A value without a colon exits with `Invalid --http-header`. Do not put secrets here unless every host you visit should receive them. |
-| `--user-agent <ua>` | string | Chrome 130 on Windows UA | Overrides the `User-Agent` request header. |
-| `--http-timeout <ms>` | integer | | Intended navigation timeout. See the known issue below. |
+| `--user-agent <ua>` | string | Chrome 130 on Windows UA | Overrides the `User-Agent` request header and `navigator.userAgent` in page scripts. Chrome client-hint headers are dropped when the value is not a Chrome User-Agent. |
+| `--http-timeout <ms>` | integer | 20000 for navigations | Navigation timeout in milliseconds. A timeout passed to an individual call (for example `goto(url, { timeoutMs })`) takes precedence. |
 | `--insecure-disable-tls-host-verification` | flag | off | Accept invalid/self-signed TLS certificates (also for proxy connections). Use only for staging or intercepting proxies. |
-| `--obey-robots` | flag | off | Fetch `/robots.txt` for every origin and refuse disallowed requests (RFC 9309). Applies to navigations, redirect hops, scripts and page `fetch()`. Rules are cached per origin for 24 h. A 4xx robots.txt means "allow all"; a 5xx or network error means "disallow all". Blocked requests fail with `Blocked by robots.txt: <url> (rules from <robots url>)` and a `[Memora] blocked by robots.txt: <url>` line on stderr. See [network-and-proxies.md](./network-and-proxies.md). |
+| `--obey-robots` | flag | off | Fetch `/robots.txt` for every origin and refuse disallowed requests (RFC 9309). Applies to navigations, redirect hops, scripts and page `fetch()`. Honours `Crawl-delay` (capped at 60 s) between requests to the same site. Rules are cached per origin for 24 h. A 4xx robots.txt means "allow all"; a 5xx or network error means "disallow all". Blocked requests fail with `Blocked by robots.txt: <url> (rules from <robots url>)` and a `[Memora] blocked by robots.txt: <url>` line on stderr. See [network-and-proxies.md](./network-and-proxies.md). |
 | `--robots-agent <token>` | `[A-Za-z_-]+` | `MemoraBrowser` | Product token matched against `User-agent:` lines in robots.txt. Letters, `_` and `-` only; anything else exits with `Invalid --robots-agent`. |
-| `--on-challenge <mode>` | `report` \| `stop` | `report` | Unreleased. What navigation does on a blocking CAPTCHA/bot challenge, block page or 429. `report` loads it and flags it; `stop` fails the navigation (`fetch` exits 1). Other values exit 1. See [challenges.md](./challenges.md). |
-| `--challenge-cooldown <sec>` | integer â‰¥ 0 | `60` | Unreleased. Pause requests to a host for this long after a blocking challenge or 429. The site's `Retry-After` takes precedence; `0` disables. |
+| `--on-challenge <mode>` | `report` \| `stop` | `report` | Added in 0.1.2. What navigation does on a blocking CAPTCHA/bot challenge, block page or 429. `report` loads it and flags it; `stop` fails the navigation (`fetch` exits 1). Other values exit 1. See [challenges.md](./challenges.md). |
+| `--challenge-cooldown <sec>` | integer ≥ 0 | `60` | Added in 0.1.2. Pause requests to a host for this long after a blocking challenge or 429. The site's `Retry-After` takes precedence; `0` disables. |
+| `--allow-domain <site>` | site, repeatable | | Added in 0.2.0. Only open pages on these sites (and their subdomains). `*.example.com` = subdomains only; `example.com/app` = that path only. See [prompt-injection-firewall.md](./prompt-injection-firewall.md#choosing-where-your-agent-can-go). |
+| `--block-domain <site>` | site, repeatable | | Added in 0.2.0. Refuse every request to these sites, including background requests from page scripts. |
+| `--block-sensitive-domains` | flag | off | Added in 0.2.0. Refuse webmail, banking and payment sites, account settings, cloud consoles, admin pages and cloud credential addresses. On automatically with `--firewall standard` or `strict`. |
 
-> **Known issue (0.1.0):** `--http-timeout` is accepted but has no effect on page navigations with the native engine: navigations always use their own 20,000 ms default. (It is honoured by the Chrome MCP engine.) Do not rely on it to bound request time; wrap calls in your own timeout instead.
-
-> **Known issue (0.1.0):** `--http-proxy` does not route traffic (see above). This is by design for the Orbis Cloud preview, but it means the startup banner says "Orbis Cloud Residential Proxies (Coming Soon...)" even when you configured a proxy via `--use-env-proxy`.
+> **Changed in 0.2.0:** `--http-proxy` now routes traffic through the given proxy (earlier versions only printed a notice), and `--http-timeout` now limits navigations with the native engine (earlier versions always used 20,000 ms).
 
 ---
 
@@ -251,7 +266,7 @@ The banner is printed to stdout once the port is listening:
 | `Discovery Endpoint: http://<host>:<port>/json/version` | What Playwright/Puppeteer call first. Also the health-check URL. |
 | `Agent Snapshot: http://<host>:<port>/orbis/snapshot` | REST agent endpoint (also `/memora/snapshot`). See [http-api.md](./http-api.md). |
 | `Memory Footprint: ~N MB` | Resident set size of the Node.js process at startup (the "Chromium uses ~350MB+" text next to it is a fixed string, not a measurement). |
-| `Proxy:` | Always shows the Orbis Cloud placeholder in 0.1.0. |
+| `Proxy:` | The configured proxy (credentials hidden), or `Direct` when no proxy is set. |
 | `Stealth Mode:` | `ACTIVE` unless `--no-stealth`. |
 
 ### WebDriver mode
@@ -267,12 +282,12 @@ The banner is printed to stdout once the port is listening:
 Prints the fetch-and-distill time, title, interactive element count, estimated prompt tokens (characters / 4), the full action map, and the first 1,000 characters of Markdown. Example against a local fixture:
 
 ```text
-ðŸ” [Orbis] Fetching & Distilling: http://127.0.0.1:18090/ ...
+🔍 [Orbis] Fetching & Distilling: http://127.0.0.1:18090/ ...
 
-âœ¨ Successfully distilled in 33.0ms!
-ðŸ“Œ Title: Signup
-ðŸŽ¯ Interactive Elements: 4
-ðŸ§  Estimated Prompt Tokens: 97
+✨ Successfully distilled in 33.0ms!
+📌 Title: Signup
+🎯 Interactive Elements: 4
+🧠 Estimated Prompt Tokens: 97
 
 === INTERACTIVE ACTION MAP (4 elements) ===
 [@1] [input] "Work email" placeholder="Work email" (selector: #email)
@@ -301,7 +316,7 @@ Timings and token counts depend on the page and machine. Real sites vary; `https
 
 ### `--mcp` mode
 
-Prints nothing on stdout except JSON-RPC responses (stdout is the protocol channel). See the [version check](#version-check-network-call-on-startup) known issue.
+Prints nothing on stdout except JSON-RPC responses (stdout is the protocol channel). Startup messages, including the [update notice](#version-check-network-call-on-startup), go to stderr.
 
 ---
 
@@ -311,7 +326,8 @@ Prints nothing on stdout except JSON-RPC responses (stdout is the protocol chann
 | :--- | :--- | :--- |
 | `ORBIS_NO_TELEMETRY` | root / `serve` | Any non-empty value disables the startup [version check](#version-check-network-call-on-startup). Recommended for production, CI and MCP. |
 | `NODE_ENV=test` | root / `serve` | Also disables the version check. |
-| `ORBIS_API_KEY`, `MEMORA_API_KEY` | CDP server, TypeScript SDK, Python SDK | Intended API key for the CDP/REST server. **Not enforced in 0.1.0**: the server stores it but accepts every request. See [security.md](./security.md). |
+| `ORBIS_API_KEY`, `MEMORA_API_KEY` | CDP server, WebDriver server, TypeScript SDK, Python SDK | API key for the CDP/REST and WebDriver servers. When set, every HTTP request and CDP WebSocket connection must send it (`x-api-key: <key>`, `Authorization: Bearer <key>` or `?apiKey=<key>`), otherwise the server answers 401. The WebDriver server also accepts `Authorization: Basic` with the key as the password, so Selenium can use `http://orbis:<key>@127.0.0.1:9515`. See [security.md](./security.md) and [selenium-webdriver.md](./selenium-webdriver.md#api-key). |
+| `ORBIS_SESSION_DIR` | CDP server, MCP server | Folder for session files read and written by the session endpoints and the `memora_session` tool. Default: the folder the server was started in. |
 | `DEBUG_CDP` | CDP server | Logs each incoming CDP request, outgoing response and event (id, method, session) to **stdout**. |
 | `DEBUG_WEBDRIVER` | WebDriver server | Logs each request (method, path, first 200 characters of the body) to **stderr**. |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (and lower-case) | all modes | Used only with `--use-env-proxy`. |
@@ -327,16 +343,18 @@ Chrome/Edge discovery for `--engine chrome|auto` checks these paths only: `C:\Pr
 | :--- | :--- | :--- |
 | Server stopped with Ctrl+C / `SIGINT` / `SIGTERM` | 0 | CDP: `[Orbis] Shutting down browser server...`; pages and connections are closed first. |
 | `--eval` finished | 0 | |
-| `--eval` failed (DNS, timeout, robots block...) | **0** | `âŒ Error during eval: <reason>` on stderr. Check stderr, not the exit code. |
-| `fetch` succeeded (any HTTP status) | 0 | |
+| `--eval` failed (DNS, timeout, robots block...) | 1 | `❌ Error during eval: <reason>` on stderr. |
+| `--eval` page answered HTTP 4xx/5xx | 1 | The page output is still printed. |
+| `fetch` succeeded (HTTP status below 400) | 0 | |
+| `fetch` page answered HTTP 4xx/5xx | 1 | The page is still printed to stdout; `HTTP <status> from <url>` on stderr. |
 | `fetch` request failed | 1 | `Fetch error: <reason>` on stderr. |
-| Port already in use | 1 | `âŒ Port N is already in use by another process.` plus a hint to use `--port N+1`. |
-| Server failed to start for another reason | 1 | `âŒ Could not start ... : <reason>` |
-| Invalid `--http-header`, `--robots-agent` or `--protocol` | 1 | `âŒ <message>` |
-| Invalid `--on-challenge`, `--challenge-cooldown` or `--handoff-timeout` (unreleased) | 1 | `âŒ <message>` |
-| `fetch` hit a challenge with `--on-challenge stop`, or a host in cooldown (unreleased) | 1 | `Fetch error: <challenge block or cooldown message>` on stderr. |
+| Port already in use | 1 | `❌ Port N is already in use by another process.` plus a hint to use `--port N+1`. |
+| Server failed to start for another reason | 1 | `❌ Could not start ... : <reason>` |
+| Invalid `--http-header`, `--robots-agent` or `--protocol` | 1 | `❌ <message>` |
+| Invalid `--on-challenge`, `--challenge-cooldown` or `--handoff-timeout` (0.1.2+) | 1 | `❌ <message>` |
+| `fetch` hit a challenge with `--on-challenge stop`, or a host in cooldown (0.1.2+) | 1 | `Fetch error: <challenge block or cooldown message>` on stderr. |
 | Unknown option / missing argument | 1 | Commander's usage error. |
-| `--mcp --engine chrome` without Chrome/Edge installed | non-zero | Crashes at startup with `No Google Chrome or Microsoft Edge executable found on this machine.` Use `--engine native` or `auto`. |
+| `--mcp --engine chrome` without Chrome/Edge installed | 1 | A clear error saying that `--engine chrome` needs Google Chrome or Microsoft Edge installed. Install one, or use `--engine native` or `auto`. |
 
 Process managers (systemd, Docker, Kubernetes) can rely on `SIGTERM` for graceful shutdown. See [production-deployment.md](./production-deployment.md).
 
@@ -347,12 +365,10 @@ Process managers (systemd, Docker, Kubernetes) can rely on `SIGTERM` for gracefu
 When the root command or `serve` starts (all modes, including `--mcp` and `--eval`; never `fetch`), Orbis sends one HTTPS request:
 
 ```text
-GET https://orbis.memora.company/api/v1/version-check?v=0.1.0
+GET https://orbis.memora.company/api/v1/version-check?v=0.2.0
 ```
 
-The request is aborted after 1.5 s and all failures are ignored, so it never blocks startup. The response can print an upgrade notice or a deprecation advisory. Disable it with `ORBIS_NO_TELEMETRY=1` (or `NODE_ENV=test`), which you should do in air-gapped, regulated or CI environments.
-
-> **Known issue (0.1.0):** the "UPDATE AVAILABLE" notice is written with `console.log`, i.e. to **stdout**. In `--mcp` mode stdout is the JSON-RPC channel, so if a newer version exists the notice can corrupt the protocol stream and confuse the MCP client. Always set `ORBIS_NO_TELEMETRY=1` in MCP client configurations (see [mcp.md](./mcp.md)).
+The request is aborted after 1.5 s and all failures are ignored, so it never blocks startup. The response can print an upgrade notice or a deprecation advisory. The notice is written to stderr, so it never mixes with the MCP protocol on stdout. Disable the check with `ORBIS_NO_TELEMETRY=1` (or `NODE_ENV=test`), which you should do in air-gapped, regulated or CI environments.
 
 ---
 
@@ -365,10 +381,10 @@ orbis --port 9222
 # Same, without the version check, with debug logging of CDP traffic
 ORBIS_NO_TELEMETRY=1 DEBUG_CDP=1 orbis --port 9222
 
-# Container: listen on all interfaces (put it behind a private network or authenticating proxy!)
-orbis --port 9222 --host 0.0.0.0
+# Container: listen on all interfaces (set an API key and keep the port on a private network)
+ORBIS_API_KEY=change-me orbis --port 9222 --host 0.0.0.0
 
-# Loopback only (IPv6 loopback is bound as given; "localhost"/"127.0.0.1" bind 0.0.0.0 in 0.1.0)
+# IPv6 loopback only
 orbis --port 9222 --host ::1
 
 # Selenium grid replacement for a test runner with 8 workers
@@ -398,15 +414,6 @@ curl -fsS http://127.0.0.1:9515/status
 
 ## Known issues
 
-Summary of 0.1.0 CLI issues documented above:
-
-- `--http-proxy` does not route traffic; use `--use-env-proxy`.
-- `--http-timeout` is ignored for native-engine navigations (fixed 20 s).
-- `localhost` / `127.0.0.1` bind to all interfaces.
-- The API key (`ORBIS_API_KEY`) is not enforced.
-- `--eval` exits 0 even when loading fails.
-- `--dump html` output is wrapped in `<#document>` tags.
-- The update notice goes to stdout, which can break `--mcp`; set `ORBIS_NO_TELEMETRY=1`.
-- `--engine chrome` crashes at startup when no Chrome/Edge is installed.
+There are no CLI-specific known issues in 0.2.0. For limits that apply to every mode, see the pages below.
 
 See also: [limitations.md](./limitations.md), [troubleshooting.md](./troubleshooting.md), [security.md](./security.md).
